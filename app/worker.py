@@ -50,7 +50,9 @@ class NotificationWorker:
             notif_id: str | None = None
             try:
                 notif_id = await asyncio.wait_for(self._queue.get(), timeout=self._poll_seconds)
-            except TimeoutError:
+            except (TimeoutError, asyncio.TimeoutError):
+                # Py3.10: asyncio.TimeoutError is not builtin TimeoutError — must catch both
+                # or the worker task dies after the first idle poll.
                 pass
             except asyncio.CancelledError:
                 raise
