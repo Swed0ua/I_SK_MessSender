@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app import db
 from app.auth import require_api_key
 from app.bitrix import dispatch_notification_mailing, parse_bitrix_request
+from app.bitrix_client import BitrixClient
 from app.config import Settings, load_settings
 from app.phone import PhoneError, normalize_phone
 from app.schemas import NotificationCreate
@@ -222,6 +223,11 @@ async def bitrix_notification_mailing(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="mailing provider is not configured",
         )
+    if not settings.bitrix_webhook_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="bitrix webhook is not configured",
+        )
 
     try:
         payload = await parse_bitrix_request(request)
@@ -229,7 +235,13 @@ async def bitrix_notification_mailing(
         logger.exception("bitrix_payload_parse_failed")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid request")
 
-    result = await dispatch_notification_mailing(payload, pool=pool, worker=worker)
+    bitrix = BitrixClient(settings.bitrix_webhook_url)
+    result = await dispatch_notification_mailing(
+        payload,
+        pool=pool,
+        worker=worker,
+        bitrix=bitrix,
+    )
 
     if result.get("accepted") and not result.get("duplicate"):
         return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=result)
@@ -237,7 +249,14 @@ async def bitrix_notification_mailing(
         return JSONResponse(status_code=status.HTTP_200_OK, content=result)
     if result.get("reason") == "ignored_stage":
         return JSONResponse(status_code=status.HTTP_200_OK, content=result)
-    if result.get("reason") in {"missing_phone", "missing_pdf_url", "missing_stage_id", "invalid_phone"}:
+    if result.get("reason") in {
+        "missing_deal_id",
+        "missing_phone",
+        "missing_pdf_url",
+        "missing_stage_id",
+        "invalid_phone",
+        "bitrix_error",
+    }:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=result)
 
     return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=result)

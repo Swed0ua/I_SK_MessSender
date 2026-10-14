@@ -33,6 +33,7 @@ class Settings:
     mychatbot_mailing_webhook_url: str | None
     mychatbot_api_token: str | None
     mychatbot_phone_id: str | None
+    bitrix_webhook_url: str | None
 
 
 def load_settings() -> Settings:
@@ -48,4 +49,5 @@ def load_settings() -> Settings:
         mychatbot_mailing_webhook_url=_optional("MYCHATBOT_MAILING_WEBHOOK_URL"),
         mychatbot_api_token=_optional("MYCHATBOT_API_TOKEN"),
         mychatbot_phone_id=_optional("MYCHATBOT_PHONE_ID"),
+        bitrix_webhook_url=_optional("BITRIX_WEBHOOK_URL"),
     )
