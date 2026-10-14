@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from fastapi import Request
+
 from app import db
 from app.bitrix_config import (
     FIELD_DEAL_ID,
@@ -24,6 +26,27 @@ def _str(payload: dict[str, Any], key: str) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+async def parse_bitrix_request(request: Request) -> dict[str, Any]:
+    """Build payload from optional body + query. Query wins (Bitrix robot URL params)."""
+    payload: dict[str, Any] = {}
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in content_type:
+        body = await request.json()
+        if isinstance(body, dict):
+            payload.update(body)
+    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        payload.update({str(k): v for k, v in form.items()})
+
+    for key, value in request.query_params.multi_items():
+        if key == "api_key":
+            continue
+        payload[key] = value
+
+    return payload
 
 
 async def process_kasa_viber(
