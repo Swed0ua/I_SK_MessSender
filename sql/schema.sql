@@ -13,10 +13,15 @@ CREATE TABLE IF NOT EXISTS notifications (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     sent_at           TIMESTAMPTZ  NULL,
     CONSTRAINT notifications_status_chk
-        CHECK (status IN ('pending', 'sent', 'failed', 'skipped')),
-    CONSTRAINT notifications_phone_type_uq
-        UNIQUE (phone, message_type)
+        CHECK (status IN ('pending', 'sent', 'failed', 'skipped'))
 );
+
+-- One-shot welcome: unique per phone+type. Bitrix mailings use idempotency_key.
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_phone_type_uq;
+
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_phone_type_welcome_uq
+    ON notifications (phone, message_type)
+    WHERE message_type = 'welcome_new_contractor';
 
 CREATE UNIQUE INDEX IF NOT EXISTS notifications_idempotency_key_uq
     ON notifications (idempotency_key)
@@ -25,3 +30,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS notifications_idempotency_key_uq
 CREATE INDEX IF NOT EXISTS notifications_status_idx
     ON notifications (status)
     WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS notifications_phone_idx
+    ON notifications (phone);

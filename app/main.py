@@ -5,15 +5,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from app import db
 from app.auth import require_api_key
+from app.bitrix import dispatch_notification_mailing
 from app.config import Settings, load_settings
 from app.phone import PhoneError, normalize_phone
 from app.schemas import NotificationCreate
-from app.sender import WebhookSender
+from app.sender import MailingSender, RoutingSender, WebhookSender
 from app.worker import NotificationWorker
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,15 @@ async def lifespan(app: FastAPI):
     pool = await db.create_pool(settings.database_url)
     await db.apply_schema(pool, str(SCHEMA_PATH))
 
-    sender = WebhookSender(settings.provider_webhook_url)
+    webhook = WebhookSender(settings.provider_webhook_url)
+    mailing = None
+    if settings.mychatbot_mailing_webhook_url:
+        mailing = MailingSender(
+            settings.mychatbot_mailing_webhook_url,
+            api_token=settings.mychatbot_api_token,
+            phone_id=settings.mychatbot_phone_id,
+        )
+    sender = RoutingSender(webhook, mailing)
     worker = NotificationWorker(
         pool,
         sender,
@@ -140,6 +149,38 @@ async def create_notification(
     )
 
 
+@app.get("/v1/notifications/by-phone")
+async def list_notifications_by_phone(
+    settings: Annotated[Settings, Depends(get_settings)],
+    pool: Annotated[Any, Depends(get_pool)],
+    phone: Annotated[str, Query(min_length=1)],
+    x_api_key: Annotated[str | None, Header(alias="X-Api-Key")] = None,
+) -> Any:
+    require_api_key(settings, x_api_key)
+
+    try:
+        normalized = normalize_phone(phone)
+    except PhoneError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    rows = await db.list_sent_by_phone(pool, normalized)
+    return {
+        "phone": normalized,
+        "count": len(rows),
+        "items": [
+            {
+                "id": row["id"],
+                "status": row["status"],
+                "message_type": row["message_type"],
+                "sent_at": row.get("sent_at"),
+                "created_at": row.get("created_at"),
+                "payload": row.get("payload") or {},
+            }
+            for row in rows
+        ],
+    }
+
+
 @app.get("/v1/notifications/{notif_id}")
 async def get_notification(
     notif_id: str,
@@ -163,3 +204,49 @@ async def get_notification(
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
+
+
+@app.post("/v1/bitrix/notification-mailing")
+async def bitrix_notification_mailing(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    pool: Annotated[Any, Depends(get_pool)],
+    worker: Annotated[NotificationWorker, Depends(get_worker)],
+    x_api_key: Annotated[str | None, Header(alias="X-Api-Key")] = None,
+    api_key: Annotated[str | None, Query()] = None,
+) -> Any:
+    require_api_key(settings, x_api_key or api_key)
+
+    if not settings.mychatbot_mailing_webhook_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="mailing provider is not configured",
+        )
+
+    content_type = (request.headers.get("content-type") or "").lower()
+    try:
+        if "application/json" in content_type:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid json body")
+        else:
+            form = await request.form()
+            payload = {str(k): v for k, v in form.items()}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("bitrix_payload_parse_failed")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
+
+    result = await dispatch_notification_mailing(payload, pool=pool, worker=worker)
+
+    if result.get("accepted") and not result.get("duplicate"):
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=result)
+    if result.get("accepted") and result.get("duplicate"):
+        return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+    if result.get("reason") == "ignored_stage":
+        return JSONResponse(status_code=status.HTTP_200_OK, content=result)
+    if result.get("reason") in {"missing_phone", "missing_pdf_url", "missing_stage_id", "invalid_phone"}:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=result)
+
+    return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content=result)

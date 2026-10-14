@@ -93,6 +93,19 @@ async def get_notification(pool: asyncpg.Pool, notif_id: str) -> dict[str, Any] 
         return row_to_dict(row) if row else None
 
 
+async def list_sent_by_phone(pool: asyncpg.Pool, phone: str) -> list[dict[str, Any]]:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM notifications
+            WHERE phone = $1 AND status = 'sent'
+            ORDER BY sent_at DESC NULLS LAST, created_at DESC
+            """,
+            phone,
+        )
+        return [row_to_dict(row) for row in rows]
+
+
 async def claim_pending(pool: asyncpg.Pool, notif_id: str | None = None) -> dict[str, Any] | None:
     """Pick one pending row (single in-process worker; mark_* guards status)."""
     async with pool.acquire() as conn:
