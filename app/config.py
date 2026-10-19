@@ -31,8 +31,6 @@ class Settings:
     worker_max_retries: int
     provider_webhook_url: str
     mychatbot_mailing_webhook_url: str | None
-    mychatbot_api_token: str | None
-    mychatbot_phone_id: str | None
     bitrix_webhook_url: str | None
 
 
@@ -47,7 +45,5 @@ def load_settings() -> Settings:
         worker_max_retries=int(os.getenv("WORKER_MAX_RETRIES", "3")),
         provider_webhook_url=_require("PROVIDER_WEBHOOK_URL"),
         mychatbot_mailing_webhook_url=_optional("MYCHATBOT_MAILING_WEBHOOK_URL"),
-        mychatbot_api_token=_optional("MYCHATBOT_API_TOKEN"),
-        mychatbot_phone_id=_optional("MYCHATBOT_PHONE_ID"),
         bitrix_webhook_url=_optional("BITRIX_WEBHOOK_URL"),
     )

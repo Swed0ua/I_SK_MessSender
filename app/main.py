@@ -15,7 +15,7 @@ from app.bitrix_client import BitrixClient
 from app.config import Settings, load_settings
 from app.phone import PhoneError, normalize_phone
 from app.schemas import NotificationCreate
-from app.sender import MailingSender, RoutingSender, WebhookSender
+from app.sender import RoutingSender, WebhookSender
 from app.worker import NotificationWorker
 
 logger = logging.getLogger(__name__)
@@ -45,15 +45,11 @@ async def lifespan(app: FastAPI):
     pool = await db.create_pool(settings.database_url)
     await db.apply_schema(pool, str(SCHEMA_PATH))
 
-    webhook = WebhookSender(settings.provider_webhook_url)
+    welcome = WebhookSender(settings.provider_webhook_url)
     mailing = None
     if settings.mychatbot_mailing_webhook_url:
-        mailing = MailingSender(
-            settings.mychatbot_mailing_webhook_url,
-            api_token=settings.mychatbot_api_token,
-            phone_id=settings.mychatbot_phone_id,
-        )
-    sender = RoutingSender(webhook, mailing)
+        mailing = WebhookSender(settings.mychatbot_mailing_webhook_url, render=True)
+    sender = RoutingSender(welcome, mailing)
     worker = NotificationWorker(
         pool,
         sender,
