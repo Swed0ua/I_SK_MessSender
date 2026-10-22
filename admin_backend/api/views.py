@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from admin_backend.api.auth import hash_token, issue_jwt
+from admin_backend.api.filters import apply_notification_filters
 from admin_backend.api.models import AdminClient, Notification
 from admin_backend.api.serializers import (
     AuthTokenSerializer,
@@ -13,6 +15,7 @@ from admin_backend.api.serializers import (
     NotificationSerializer,
 )
 from admin_backend.api.services import send_manual_message
+from app.phone import PhoneError, normalize_phone
 
 
 class AuthTokenView(APIView):
@@ -41,7 +44,28 @@ class AuthTokenView(APIView):
 class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
-    queryset = Notification.objects.all().order_by("-created_at")
+
+    def get_queryset(self):
+        return apply_notification_filters(
+            Notification.objects.all().order_by("-created_at"),
+            self.request.query_params,
+        )
+
+
+class NotificationByPhoneView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        try:
+            phone = normalize_phone(self.kwargs["phone"])
+        except PhoneError as exc:
+            raise ValidationError({"phone": str(exc)}) from exc
+        return apply_notification_filters(
+            Notification.objects.all().order_by("-created_at"),
+            self.request.query_params,
+            force_phone=phone,
+        )
 
 
 class ManualSendView(APIView):
