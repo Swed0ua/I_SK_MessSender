@@ -9,6 +9,8 @@ pip install -r requirements-admin.txt
 py run_admin.py
 ```
 
+Веб-форма: `http://127.0.0.1:8081/` (`web_admin/index.html`, той самий origin що API).
+
 Створити клієнта:
 
 ```bash

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MessSender · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #e8eef2;
+      --bg1: #f4f7f9;
+      --ink: #14212b;
+      --ink-soft: #3d4f5c;
+      --muted: #6b7c88;
+      --line: rgba(20, 33, 43, 0.1);
+      --panel: rgba(255, 255, 255, 0.78);
+      --panel-solid: #ffffff;
+      --accent: #0b7a75;
+      --accent-deep: #065f5b;
+      --accent-glow: rgba(11, 122, 117, 0.18);
+      --sent: #1a7a4c;
+      --sent-bg: #e6f5ed;
+      --failed: #b42318;
+      --failed-bg: #fdecea;
+      --pending: #9a6700;
+      --pending-bg: #fff6df;
+      --skipped: #5c6b75;
+      --skipped-bg: #eef1f3;
+      --shadow: 0 18px 50px rgba(20, 33, 43, 0.1);
+      --radius: 18px;
+      --font: "Figtree", system-ui, sans-serif;
+      --display: "Syne", "Figtree", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 12% -10%, rgba(11, 122, 117, 0.16), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(20, 33, 43, 0.08), transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #edf3f6);
+      min-height: 100%;
+    }
+
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    a { color: var(--accent-deep); }
+
+    .hidden { display: none !important; }
+
+    /* —— Login —— */
+    #view-login {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 32px 20px;
+      animation: rise 0.55s ease both;
+    }
+    .login-shell {
+      width: min(420px, 100%);
+      padding: 40px 36px 34px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 6px);
+      box-shadow: var(--shadow);
+    }
+    .brand {
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: clamp(2rem, 5vw, 2.45rem);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin: 0 0 8px;
+    }
+    .brand span { color: var(--accent); }
+    .lede {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.45;
+    }
+    .field { display: grid; gap: 7px; margin-bottom: 14px; }
+    .field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .field input, .field select, .field textarea,
+    .filters input, .filters select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel-solid);
+      border-radius: 12px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field textarea { min-height: 140px; resize: vertical; }
+    .field input:focus, .field select:focus, .field textarea:focus,
+    .filters input:focus, .filters select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-weight: 600;
+      transition: transform 0.12s, background 0.15s, opacity 0.15s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-deep); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .btn-ghost:hover { background: rgba(20, 33, 43, 0.04); }
+    .btn-soft {
+      background: var(--accent-glow);
+      color: var(--accent-deep);
+    }
+    .btn-soft:hover { background: rgba(11, 122, 117, 0.28); }
+    .btn-sm { padding: 8px 12px; font-size: 0.88rem; border-radius: 10px; }
+    .err {
+      margin-top: 12px;
+      color: var(--failed);
+      font-size: 0.9rem;
+      min-height: 1.2em;
+    }
+
+    /* —— App shell —— */
+    #view-app {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      animation: rise 0.45s ease both;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px clamp(16px, 4vw, 40px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .topbar .brand { font-size: 1.45rem; margin: 0; }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tabs {
+      display: inline-flex;
+      padding: 4px;
+      background: rgba(20, 33, 43, 0.06);
+      border-radius: 14px;
+      gap: 2px;
+    }
+    .tab {
+      border: none;
+      background: transparent;
+      padding: 9px 16px;
+      border-radius: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: background 0.18s, color 0.18s, transform 0.18s;
+    }
+    .tab.active {
+      background: var(--panel-solid);
+      color: var(--ink);
+      box-shadow: 0 4px 14px rgba(20, 33, 43, 0.08);
+    }
+    .main {
+      width: min(980px, 100%);
+      margin: 0 auto;
+      padding: 28px clamp(16px, 4vw, 40px) 48px;
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 36px rgba(20, 33, 43, 0.06);
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .panel-head h2 {
+      margin: 0 0 4px;
+      font-family: var(--display);
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+    .panel-head p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr) auto;
+      gap: 10px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.4);
+    }
+    @media (max-width: 820px) {
+      .filters { grid-template-columns: 1fr 1fr; }
+      .filters .filter-actions { grid-column: 1 / -1; }
+    }
+
+    .list { list-style: none; margin: 0; padding: 0; }
+    .row {
+      border-bottom: 1px solid var(--line);
+      transition: background 0.15s;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-main {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 20px;
+      border: none;
+      background: transparent;
+      text-align: left;
+    }
+    .row-main:hover { background: rgba(11, 122, 117, 0.04); }
+    .row.open .row-main { background: rgba(11, 122, 117, 0.06); }
+    .row-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 14px;
+    }
+    .phone {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .row-sub {
+      margin-top: 4px;
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 52ch;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .badge::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .badge-sent { color: var(--sent); background: var(--sent-bg); }
+    .badge-failed { color: var(--failed); background: var(--failed-bg); }
+    .badge-pending { color: var(--pending); background: var(--pending-bg); }
+    .badge-skipped { color: var(--skipped); background: var(--skipped-bg); }
+
+    .detail {
+      display: none;
+      padding: 0 20px 16px;
+      animation: expand 0.22s ease both;
+    }
+    .row.open .detail { display: block; }
+    .detail-grid {
+      display: grid;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(20, 33, 43, 0.035);
+      border: 1px solid var(--line);
+    }
+    .detail-grid pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .kv { display: grid; gap: 2px; }
+    .kv span { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .empty, .loading {
+      padding: 48px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .send-wrap { padding: 22px 20px 24px; max-width: 520px; }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 50;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      box-shadow: var(--shadow);
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      max-width: min(360px, calc(100vw - 40px));
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok { background: var(--sent); }
+    .toast.bad { background: var(--failed); }
+
+    /* Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 33, 43, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 40;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100%;
+      width: min(440px, 100%);
+      background: var(--panel-solid);
+      box-shadow: -12px 0 40px rgba(20, 33, 43, 0.18);
+      transform: translateX(104%);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 41;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head {
+      padding: 20px 20px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .drawer-head h3 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: 1.2rem;
+      letter-spacing: -0.02em;
+    }
+    .drawer-body { overflow: auto; padding: 8px 0 24px; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes expand {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="view-login">
+    <div class="login-shell">
+      <h1 class="brand">Mess<span>Sender</span></h1>
+      <p class="lede">Адмінка розсилок: історія, фільтри й ручна відправка.</p>
+      <form id="login-form">
+        <div class="field">
+          <label for="login-name">Клієнт</label>
+          <input id="login-name" name="name" autocomplete="username" required placeholder="web-admin" />
+        </div>
+        <div class="field">
+          <label for="login-token">Token</label>
+          <input id="login-token" name="token" type="password" autocomplete="current-password" required minlength="8" />
+        </div>
+        <button class="btn btn-primary" type="submit" id="login-btn">Увійти</button>
+        <div class="err" id="login-err"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="view-app" class="hidden">
+    <header class="topbar">
+      <h1 class="brand">Mess<span>Sender</span></h1>
+      <div class="top-actions">
+        <nav class="tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="history" id="tab-history">Історія</button>
+          <button type="button" class="tab" data-tab="send" id="tab-send">Надіслати</button>
+        </nav>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-logout">Вийти</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section id="panel-history" class="panel">
+        <div class="panel-head">
+          <h2>Останні сповіщення</h2>
+          <p>Розгорни рядок · історія по номеру · написати користувачу</p>
+        </div>
+        <div class="filters">
+          <select id="f-status" aria-label="Статус">
+            <option value="">Усі статуси</option>
+            <option value="sent">Надіслано</option>
+            <option value="failed">Помилка</option>
+            <option value="pending">В очікуванні</option>
+            <option value="skipped">Пропущено</option>
+          </select>
+          <input id="f-phone" type="text" placeholder="Телефон" aria-label="Телефон" />
+          <input id="f-date" type="date" aria-label="Дата" />
+          <select id="f-hour" aria-label="Година">
+            <option value="">Година</option>
+          </select>
+          <div class="filter-actions" style="display:flex;gap:8px">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-filter" style="width:auto">Знайти</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-filter-reset">Скинути</button>
+          </div>
+        </div>
+        <div id="list-host">
+          <div class="loading">Завантаження…</div>
+        </div>
+        <div class="pager">
+          <span id="pager-info">—</span>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-prev" disabled>Назад</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-next" disabled>Далі</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-send" class="panel hidden">
+        <div class="panel-head">
+          <h2>Надіслати повідомлення</h2>
+          <p>MyChatbot Trigger Outreach · запис у notifications</p>
+        </div>
+        <form class="send-wrap" id="send-form">
+          <div class="field">
+            <label for="send-phone">Телефон</label>
+            <input id="send-phone" required placeholder="+380XXXXXXXXX" />
+          </div>
+          <div class="field">
+            <label for="send-text">Текст</label>
+            <textarea id="send-text" required maxlength="4000" placeholder="Текст повідомлення"></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit" id="send-btn">Надіслати</button>
+          <div class="err" id="send-err"></div>
+          <div id="send-result" class="hidden" style="margin-top:16px"></div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <h3 id="drawer-title">Історія номера</h3>
+        <p class="meta" id="drawer-sub" style="margin:6px 0 0"></p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="drawer-close">Закрити</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    (() => {
+      const API = "/api/v1";
+      const TOKEN_KEY = "ms_admin_jwt";
+      const NAME_KEY = "ms_admin_name";
+
+      const $ = (id) => document.getElementById(id);
+      const viewLogin = $("view-login");
+      const viewApp = $("view-app");
+      const listHost = $("list-host");
+      const toastEl = $("toast");
+      const drawer = $("drawer");
+      const drawerBackdrop = $("drawer-backdrop");
+
+      const hourSelect = $("f-hour");
+      for (let h = 0; h < 24; h++) {
+        const opt = document.createElement("option");
+        opt.value = String(h);
+        opt.textContent = `${String(h).padStart(2, "0")}:00`;
+        hourSelect.appendChild(opt);
+      }
+
+      const state = {
+        page: 1,
+        count: 0,
+        pageSize: 20,
+        expandedId: null,
+        filters: {},
+      };
+
+      const STATUS = {
+        sent: { label: "Надіслано", cls: "badge-sent" },
+        failed: { label: "Помилка", cls: "badge-failed" },
+        pending: { label: "В очікуванні", cls: "badge-pending" },
+        skipped: { label: "Пропущено", cls: "badge-skipped" },
+      };
+
+      function token() {
+        return sessionStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function setAuth(accessToken, name) {
+        sessionStorage.setItem(TOKEN_KEY, accessToken);
+        if (name) sessionStorage.setItem(NAME_KEY, name);
+      }
+
+      function clearAuth() {
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(NAME_KEY);
+      }
+
+      function showToast(msg, kind) {
+        toastEl.textContent = msg;
+        toastEl.className = "toast show" + (kind ? ` ${kind}` : "");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => toastEl.classList.remove("show"), 3200);
+      }
+
+      function badgeHtml(status) {
+        const s = STATUS[status] || { label: status || "—", cls: "badge-skipped" };
+        return `<span class="badge ${s.cls}">${esc(s.label)}</span>`;
+      }
+
+      function esc(s) {
+        return String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function fmtTime(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return esc(iso);
+        return d.toLocaleString("uk-UA", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        });
+      }
+
+      function previewText(n) {
+        const t = n?.payload?.text || n?.payload?.context || "";
+        if (t) return t;
+        if (n?.error) return n.error;
+        return n?.message_type || "";
+      }
+
+      async function api(path, options = {}) {
+        const headers = Object.assign({ Accept: "application/json" }, options.headers || {});
+        if (options.body && !headers["Content-Type"]) {
+          headers["Content-Type"] = "application/json";
+        }
+        const t = token();
+        if (t) headers.Authorization = `Bearer ${t}`;
+        const res = await fetch(API + path, { ...options, headers });
+        let data = null;
+        const raw = await res.text();
+        try { data = raw ? JSON.parse(raw) : null; } catch { data = { detail: raw }; }
+        if (res.status === 401) {
+          clearAuth();
+          showApp(false);
+          throw new Error("Сесія закінчилась. Увійдіть знову.");
+        }
+        if (!res.ok) {
+          const detail = data?.detail || data?.phone || data?.status || data?.non_field_errors;
+          const msg = typeof detail === "string"
+            ? detail
+            : (detail ? JSON.stringify(detail) : `HTTP ${res.status}`);
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      function showApp(on) {
+        viewLogin.classList.toggle("hidden", on);
+        viewApp.classList.toggle("hidden", !on);
+        if (on) {
+          switchTab("history");
+          loadList();
+        }
+      }
+
+      function switchTab(name) {
+        document.querySelectorAll(".tab").forEach((el) => {
+          el.classList.toggle("active", el.dataset.tab === name);
+        });
+        $("panel-history").classList.toggle("hidden", name !== "history");
+        $("panel-send").classList.toggle("hidden", name !== "send");
+      }
+
+      function goSend(phone) {
+        switchTab("send");
+        if (phone) $("send-phone").value = phone;
+        $("send-text").focus();
+      }
+
+      function collectFilters() {
+        const status = $("f-status").value.trim();
+        const phone = $("f-phone").value.trim();
+        const date = $("f-date").value.trim();
+        const hour = $("f-hour").value.trim();
+        const f = {};
+        if (status) f.status = status;
+        if (phone) f.phone = phone;
+        if (date) f.date = date;
+        if (hour !== "" && date) f.hour = hour;
+        return f;
+      }
+
+      function qs(params) {
+        const u = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+          if (v !== undefined && v !== null && v !== "") u.set(k, v);
+        });
+        const s = u.toString();
+        return s ? `?${s}` : "";
+      }
+
+      async function loadList() {
+        listHost.innerHTML = `<div class="loading">Завантаження…</div>`;
+        try {
+          const data = await api(`/notifications${qs({ ...state.filters, page: state.page })}`);
+          const results = data.results || data || [];
+          state.count = data.count ?? results.length;
+          state.pageSize = 20;
+          renderList(results);
+          const pages = Math.max(1, Math.ceil(state.count / state.pageSize));
+          $("pager-info").textContent = state.count
+            ? `Стор. ${state.page} з ${pages} · ${state.count} записів`
+            : "Немає записів";
+          $("btn-prev").disabled = state.page <= 1;
+          $("btn-next").disabled = state.page >= pages || !data.next;
+        } catch (e) {
+          listHost.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+          $("pager-info").textContent = "—";
+        }
+      }
+
+      function renderList(items) {
+        if (!items.length) {
+          listHost.innerHTML = `<div class="empty">Нічого не знайдено</div>`;
+          return;
+        }
+        listHost.innerHTML = `<ul class="list">${items.map(rowHtml).join("")}</ul>`;
+        listHost.querySelectorAll("[data-expand]").forEach((btn) => {
+          btn.addEventListener("click", () => toggleExpand(btn.closest(".row")));
+        });
+        listHost.querySelectorAll("[data-by-phone]").forEach((btn) => {
+          btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            openPhoneDrawer(btn.dataset.byPhone);
+          });
+        });
+        listHost.querySelectorAll("[data-write]").forEach((btn) => {
+          btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            goSend(btn.dataset.write);
+          });
+        });
+        if (state.expandedId) {
+          const row = listHost.querySelector(`[data-id="${CSS.escape(state.expandedId)}"]`);
+          if (row) row.classList.add("open");
+        }
+      }
+
+      function rowHtml(n) {
+        const open = state.expandedId === n.id ? " open" : "";
+        return `
+          <li class="row${open}" data-id="${esc(n.id)}">
+            <button type="button" class="row-main" data-expand>
+              <div>
+                <div class="row-title">
+                  <span class="phone">${esc(n.phone)}</span>
+                  <span class="meta">${esc(n.message_type || "")} · ${fmtTime(n.created_at)}</span>
+                </div>
+                <div class="row-sub">${esc(previewText(n))}</div>
+              </div>
+              ${badgeHtml(n.status)}
+            </button>
+            <div class="detail">
+              <div class="detail-grid">
+                <div class="kv"><span>Текст</span><pre>${esc(previewText(n) || "—")}</pre></div>
+                ${n.error ? `<div class="kv"><span>Помилка</span><pre>${esc(n.error)}</pre></div>` : ""}
+                <div class="kv"><span>Надіслано</span><div>${fmtTime(n.sent_at)}</div></div>
+                <div class="kv"><span>ID</span><div class="meta">${esc(n.id)}</div></div>
+                <div class="actions">
+                  <button type="button" class="btn btn-soft btn-sm" data-by-phone="${esc(n.phone)}">Усі по цьому номеру</button>
+                  <button type="button" class="btn btn-primary btn-sm" style="width:auto" data-write="${esc(n.phone)}">Написати</button>
+                </div>
+              </div>
+            </div>
+          </li>`;
+      }
+
+      function toggleExpand(row) {
+        if (!row) return;
+        const id = row.dataset.id;
+        const was = row.classList.contains("open");
+        listHost.querySelectorAll(".row.open").forEach((r) => r.classList.remove("open"));
+        if (!was) {
+          row.classList.add("open");
+          state.expandedId = id;
+        } else {
+          state.expandedId = null;
+        }
+      }
+
+      async function openPhoneDrawer(phone) {
+        drawer.classList.add("open");
+        drawerBackdrop.classList.add("open");
+        drawer.setAttribute("aria-hidden", "false");
+        $("drawer-title").textContent = phone;
+        $("drawer-sub").textContent = "Усі розсилки на цей номер";
+        $("drawer-body").innerHTML = `<div class="loading">Завантаження…</div>`;
+        try {
+          const encoded = encodeURIComponent(phone);
+          const data = await api(`/notifications/by-phone/${encoded}${qs({ page: 1 })}`);
+          const results = data.results || [];
+          if (!results.length) {
+            $("drawer-body").innerHTML = `<div class="empty">Немає записів</div>`;
+            return;
+          }
+          $("drawer-body").innerHTML = `
+            <div style="padding:8px 20px 0;display:flex;justify-content:flex-end">
+              <button type="button" class="btn btn-primary btn-sm" style="width:auto" id="drawer-write">Написати</button>
+            </div>
+            <ul class="list">${results.map((n) => `
+              <li class="row">
+                <div class="row-main" style="cursor:default">
+                  <div>
+                    <div class="row-title">
+                      <span class="meta">${esc(n.message_type)} · ${fmtTime(n.created_at)}</span>
+                    </div>
+                    <div class="row-sub" style="max-width:100%;white-space:normal">${esc(previewText(n))}</div>
+                    ${n.error ? `<div class="meta" style="margin-top:6px;color:var(--failed)">${esc(n.error)}</div>` : ""}
+                  </div>
+                  ${badgeHtml(n.status)}
+                </div>
+              </li>`).join("")}
+            </ul>`;
+          $("drawer-write")?.addEventListener("click", () => {
+            closeDrawer();
+            goSend(phone);
+          });
+        } catch (e) {
+          $("drawer-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+        }
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove("open");
+        drawerBackdrop.classList.remove("open");
+        drawer.setAttribute("aria-hidden", "true");
+      }
+
+      $("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = $("login-name").value.trim();
+        const tok = $("login-token").value;
+        $("login-err").textContent = "";
+        $("login-btn").disabled = true;
+        try {
+          const data = await fetch(API + "/auth/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ name, token: tok }),
+          }).then(async (res) => {
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.detail || "Невірні дані");
+            return body;
+          });
+          setAuth(data.access_token, name);
+          showApp(true);
+        } catch (err) {
+          $("login-err").textContent = err.message;
+        } finally {
+          $("login-btn").disabled = false;
+        }
+      });
+
+      $("btn-logout").addEventListener("click", () => {
+        clearAuth();
+        showApp(false);
+      });
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+      });
+
+      $("btn-filter").addEventListener("click", () => {
+        state.filters = collectFilters();
+        state.page = 1;
+        loadList();
+      });
+      $("btn-filter-reset").addEventListener("click", () => {
+        $("f-status").value = "";
+        $("f-phone").value = "";
+        $("f-date").value = "";
+        $("f-hour").value = "";
+        state.filters = {};
+        state.page = 1;
+        loadList();
+      });
+      $("btn-prev").addEventListener("click", () => {
+        if (state.page > 1) { state.page -= 1; loadList(); }
+      });
+      $("btn-next").addEventListener("click", () => {
+        state.page += 1;
+        loadList();
+      });
+
+      $("drawer-close").addEventListener("click", closeDrawer);
+      drawerBackdrop.addEventListener("click", closeDrawer);
+
+      $("send-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        $("send-err").textContent = "";
+        $("send-result").classList.add("hidden");
+        $("send-btn").disabled = true;
+        try {
+          const notif = await api("/notifications/send", {
+            method: "POST",
+            body: JSON.stringify({
+              phone: $("send-phone").value.trim(),
+              text: $("send-text").value,
+            }),
+          });
+          $("send-result").classList.remove("hidden");
+          $("send-result").innerHTML = `
+            <div class="detail-grid">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                <strong>${esc(notif.phone)}</strong>
+                ${badgeHtml(notif.status)}
+              </div>
+              <div class="kv"><span>Текст</span><pre>${esc(notif.payload?.text || "")}</pre></div>
+              ${notif.error ? `<div class="kv"><span>Помилка</span><pre>${esc(notif.error)}</pre></div>` : ""}
+            </div>`;
+          showToast(
+            notif.status === "sent" ? "Повідомлення надіслано" : `Статус: ${STATUS[notif.status]?.label || notif.status}`,
+            notif.status === "sent" ? "ok" : (notif.status === "failed" ? "bad" : "")
+          );
+          if (notif.status === "sent") $("send-text").value = "";
+        } catch (err) {
+          $("send-err").textContent = err.message;
+          showToast(err.message, "bad");
+        } finally {
+          $("send-btn").disabled = false;
+        }
+      });
+
+      if (token()) showApp(true);
+      else showApp(false);
+    })();
+  </script>
+</body>
+</html>
