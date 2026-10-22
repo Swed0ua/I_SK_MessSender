@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS notifications (
         CHECK (status IN ('pending', 'sent', 'failed', 'skipped'))
 );
 
--- One-shot welcome: unique per phone+type. Bitrix mailings use idempotency_key.
+-- Welcome only: one send per phone. Admin/Bitrix may send many times to same phone.
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_phone_type_uq;
+DROP INDEX IF EXISTS notifications_phone_type_uq;
 
 CREATE UNIQUE INDEX IF NOT EXISTS notifications_phone_type_welcome_uq
     ON notifications (phone, message_type)
