@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MessSender · Admin</title>
+  <title>Розсилка · Smart Kasa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
@@ -70,15 +70,29 @@
       border-radius: calc(var(--radius) + 6px);
       box-shadow: var(--shadow);
     }
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 10px;
+    }
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+      display: block;
+    }
     .brand {
       font-family: var(--display);
       font-weight: 800;
-      font-size: clamp(2rem, 5vw, 2.45rem);
-      letter-spacing: -0.04em;
+      font-size: clamp(1.85rem, 4.5vw, 2.25rem);
+      letter-spacing: -0.03em;
       line-height: 1;
-      margin: 0 0 8px;
+      margin: 0;
+      color: #1b2b4a;
+      text-transform: uppercase;
     }
-    .brand span { color: var(--accent); }
+    .brand span { color: #2daaff; }
     .lede {
       margin: 0 0 28px;
       color: var(--muted);
@@ -114,33 +128,55 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      border: none;
+      border: 1px solid transparent;
       border-radius: 12px;
-      padding: 12px 18px;
+      padding: 11px 18px;
       font-weight: 600;
-      transition: transform 0.12s, background 0.15s, opacity 0.15s;
+      line-height: 1.25;
+      min-height: 44px;
+      transition: transform 0.12s, background 0.15s, opacity 0.15s, border-color 0.15s;
     }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .btn-primary {
       background: var(--accent);
+      border-color: var(--accent);
       color: #fff;
       width: 100%;
       margin-top: 8px;
     }
-    .btn-primary:hover:not(:disabled) { background: var(--accent-deep); }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-deep);
+      border-color: var(--accent-deep);
+    }
     .btn-ghost {
-      background: transparent;
+      background: var(--panel-solid);
       color: var(--ink-soft);
-      border: 1px solid var(--line);
+      border-color: var(--line);
     }
     .btn-ghost:hover { background: rgba(20, 33, 43, 0.04); }
     .btn-soft {
       background: var(--accent-glow);
+      border-color: transparent;
       color: var(--accent-deep);
     }
     .btn-soft:hover { background: rgba(11, 122, 117, 0.28); }
-    .btn-sm { padding: 8px 12px; font-size: 0.88rem; border-radius: 10px; }
+    .btn-sm {
+      padding: 8px 14px;
+      font-size: 0.88rem;
+      border-radius: 10px;
+      min-height: 40px;
+    }
+    .filter-actions {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .filter-actions .btn {
+      width: auto;
+      margin-top: 0;
+      flex: 1 1 auto;
+    }
     .err {
       margin-top: 12px;
       color: var(--failed);
@@ -168,7 +204,9 @@
       top: 0;
       z-index: 20;
     }
-    .topbar .brand { font-size: 1.45rem; margin: 0; }
+    .topbar .brand-lockup { margin: 0; gap: 10px; }
+    .topbar .brand-logo { width: 34px; height: 34px; }
+    .topbar .brand { font-size: 1.2rem; }
     .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .tabs {
       display: inline-flex;
@@ -415,7 +453,10 @@
 <body>
   <div id="view-login">
     <div class="login-shell">
-      <h1 class="brand">Mess<span>Sender</span></h1>
+      <div class="brand-lockup">
+        <img class="brand-logo" src="/assets/logo-background.svg" alt="Smart Kasa" width="48" height="48" />
+        <h1 class="brand">Роз<span>силка</span></h1>
+      </div>
       <p class="lede">Адмінка розсилок: історія, фільтри й ручна відправка.</p>
       <form id="login-form">
         <div class="field">
@@ -434,7 +475,10 @@
 
   <div id="view-app" class="hidden">
     <header class="topbar">
-      <h1 class="brand">Mess<span>Sender</span></h1>
+      <div class="brand-lockup">
+        <img class="brand-logo" src="/assets/logo-background.svg" alt="Smart Kasa" width="34" height="34" />
+        <h1 class="brand">Роз<span>силка</span></h1>
+      </div>
       <div class="top-actions">
         <nav class="tabs" role="tablist">
           <button type="button" class="tab active" data-tab="history" id="tab-history">Історія</button>
@@ -463,8 +507,8 @@
           <select id="f-hour" aria-label="Година">
             <option value="">Година</option>
           </select>
-          <div class="filter-actions" style="display:flex;gap:8px">
-            <button type="button" class="btn btn-primary btn-sm" id="btn-filter" style="width:auto">Знайти</button>
+          <div class="filter-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-filter">Знайти</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-filter-reset">Скинути</button>
           </div>
         </div>
