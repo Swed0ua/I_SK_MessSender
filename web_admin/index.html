@@ -554,15 +554,19 @@
       };
 
       function token() {
-        return sessionStorage.getItem(TOKEN_KEY) || "";
+        return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || "";
       }
 
       function setAuth(accessToken, name) {
-        sessionStorage.setItem(TOKEN_KEY, accessToken);
-        if (name) sessionStorage.setItem(NAME_KEY, name);
+        localStorage.setItem(TOKEN_KEY, accessToken);
+        if (name) localStorage.setItem(NAME_KEY, name);
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(NAME_KEY);
       }
 
       function clearAuth() {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(NAME_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(NAME_KEY);
       }
