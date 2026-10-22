@@ -419,12 +419,12 @@
       <p class="lede">Адмінка розсилок: історія, фільтри й ручна відправка.</p>
       <form id="login-form">
         <div class="field">
-          <label for="login-name">Клієнт</label>
-          <input id="login-name" name="name" autocomplete="username" required placeholder="web-admin" />
+          <label for="login-username">Логін</label>
+          <input id="login-username" name="username" autocomplete="username" required placeholder="operator" />
         </div>
         <div class="field">
-          <label for="login-token">Token</label>
-          <input id="login-token" name="token" type="password" autocomplete="current-password" required minlength="8" />
+          <label for="login-password">Пароль</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required minlength="8" />
         </div>
         <button class="btn btn-primary" type="submit" id="login-btn">Увійти</button>
         <div class="err" id="login-err"></div>
@@ -814,21 +814,21 @@
 
       $("login-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const name = $("login-name").value.trim();
-        const tok = $("login-token").value;
+        const username = $("login-username").value.trim();
+        const password = $("login-password").value;
         $("login-err").textContent = "";
         $("login-btn").disabled = true;
         try {
           const data = await fetch(API + "/auth/token", {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({ name, token: tok }),
+            body: JSON.stringify({ username, password }),
           }).then(async (res) => {
             const body = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(body.detail || "Невірні дані");
             return body;
           });
-          setAuth(data.access_token, name);
+          setAuth(data.access_token, username);
           showApp(true);
         } catch (err) {
           $("login-err").textContent = err.message;

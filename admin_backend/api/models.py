@@ -6,7 +6,7 @@ from django.db import models
 
 
 class AdminClient(models.Model):
-    """API clients that can exchange a secret token for a JWT."""
+    """Dev/API clients: exchange a secret token for a JWT."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=128, unique=True)
@@ -20,6 +20,31 @@ class AdminClient(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+
+class AdminUser(models.Model):
+    """Human operators: username + password → JWT (web UI)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(max_length=128, unique=True)
+    password_hash = models.CharField(max_length=128)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "admin_api_users"
+        ordering = ["username"]
+
+    def __str__(self) -> str:
+        return self.username
+
+    @property
+    def name(self) -> str:
+        return self.username
 
     @property
     def is_authenticated(self) -> bool:

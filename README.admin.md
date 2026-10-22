@@ -9,12 +9,48 @@ pip install -r requirements-admin.txt
 py run_admin.py
 ```
 
-Веб-форма: `http://127.0.0.1:8081/` (`web_admin/index.html`, той самий origin що API).
+Веб-форма: `http://127.0.0.1:8081/` (`web_admin/index.html`).
 
-Створити клієнта:
+Міграції застосовуються при старті `run_admin.py`.
+
+## Користувачі та токени
+
+Два типи доступу:
+
+| Тип | Для чого | Логін |
+|-----|----------|--------|
+| **User** (username + password) | люди / веб-адмінка | `username` + `password` |
+| **Client** (name + token) | розробка, Postman | `name` + `token` |
+
+Паролі й токени зберігаються лише як хеш. При створенні raw значення друкується **один раз**.
+
+### Користувачі (паролі)
 
 ```bash
-py manage_admin.py create_admin_client --name web-admin --token <secret>
+# створити / оновити пароль (якщо --password без значення — згенерується)
+py manage_admin.py create_admin_user --username operator --password "SecretPass1"
+
+# список
+py manage_admin.py list_admin_users
+
+# видалити
+py manage_admin.py delete_admin_user --username operator
+```
+
+### Клієнти (токени, для dev)
+
+```bash
+# створити / оновити токен
+py manage_admin.py create_admin_client --name postman-dev --token "skadmin_dev_token_001"
+
+# або без --token — згенерує сам
+py manage_admin.py create_admin_client --name postman-dev
+
+# список
+py manage_admin.py list_admin_clients
+
+# видалити
+py manage_admin.py delete_admin_client --name postman-dev
 ```
 
 ## Env
@@ -32,11 +68,19 @@ py manage_admin.py create_admin_client --name web-admin --token <secret>
 
 `POST /api/v1/auth/token`
 
+Користувач (веб):
+
 ```json
-{ "name": "web-admin", "token": "<secret>" }
+{ "username": "operator", "password": "SecretPass1" }
 ```
 
-Відповідь: `{ "access_token": "...", "token_type": "Bearer" }`
+Клієнт (dev):
+
+```json
+{ "name": "postman-dev", "token": "skadmin_dev_token_001" }
+```
+
+Відповідь: `{ "access_token": "...", "token_type": "Bearer", "kind": "user"|"client" }`
 
 Далі: `Authorization: Bearer <access_token>`
 

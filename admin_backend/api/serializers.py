@@ -6,8 +6,30 @@ from admin_backend.api.models import Notification
 
 
 class AuthTokenSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=128)
-    token = serializers.CharField(min_length=8, max_length=255)
+    """Either username+password (users) or name+token (dev API clients)."""
+
+    username = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    password = serializers.CharField(min_length=8, max_length=255, required=False, allow_blank=True)
+    name = serializers.CharField(max_length=128, required=False, allow_blank=True)
+    token = serializers.CharField(min_length=8, max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        username = (attrs.get("username") or "").strip()
+        password = attrs.get("password") or ""
+        name = (attrs.get("name") or "").strip()
+        token = attrs.get("token") or ""
+
+        has_user = bool(username and password)
+        has_client = bool(name and token)
+        if has_user and has_client:
+            raise serializers.ValidationError("use either username/password or name/token")
+        if not has_user and not has_client:
+            raise serializers.ValidationError("provide username+password or name+token")
+
+        attrs["username"] = username
+        attrs["name"] = name
+        attrs["mode"] = "user" if has_user else "client"
+        return attrs
 
 
 class NotificationSerializer(serializers.ModelSerializer):

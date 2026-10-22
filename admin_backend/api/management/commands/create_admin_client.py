@@ -9,10 +9,10 @@ from admin_backend.api.models import AdminClient
 
 
 class Command(BaseCommand):
-    help = "Create an admin API client and print its raw token once."
+    help = "Create/update a token-based API client (for development / Postman)."
 
     def add_arguments(self, parser):
-        parser.add_argument("--name", required=True, help="Client name, e.g. web-admin")
+        parser.add_argument("--name", required=True, help="Client name, e.g. postman-dev")
         parser.add_argument(
             "--token",
             default="",
