@@ -4,6 +4,17 @@
 
 ## Запуск
 
+**Прод / разом з MessSender** — один процес:
+
+```bash
+pip install -r requirements.txt
+py run.py
+```
+
+Піднімає MessSender (`HOST`/`PORT`, зазвичай `:8080`) і Admin (`ADMIN_HOST`/`ADMIN_PORT`, зазвичай `:8081`).
+
+**Лише адмінка** (локально):
+
 ```bash
 pip install -r requirements-admin.txt
 py run_admin.py
@@ -11,7 +22,7 @@ py run_admin.py
 
 Веб-форма: `http://127.0.0.1:8081/` (`web_admin/index.html`).
 
-Міграції застосовуються при старті `run_admin.py`.
+Міграції `admin_api` застосовуються при старті admin (з `run.py` або `run_admin.py`).
 
 ## Користувачі та токени
 

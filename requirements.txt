@@ -5,3 +5,9 @@ pydantic==2.10.4
 python-dotenv==1.0.1
 httpx==0.28.1
 python-multipart==0.0.20
+
+# Admin API (started by run.py; also see requirements-admin.txt)
+Django==5.1.6
+djangorestframework==3.15.2
+PyJWT==2.10.1
+psycopg2-binary==2.9.10
