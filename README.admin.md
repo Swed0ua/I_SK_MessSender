@@ -49,7 +49,7 @@ Query (усі опційні):
 | Параметр | Приклад | Опис |
 |----------|---------|------|
 | `status` | `sent`, `failed`, `pending`, `skipped` | також `success` → sent, `unsuccessful` → failed |
-| `phone` | `+380682417953` | нормалізація UA |
+| `phone` | `+380XXXXXXXXX` | нормалізація UA |
 | `date` | `2026-10-22` | календарний день (`Europe/Kyiv`) |
 | `hour` | `15` | година 0–23, тільки разом з `date` |
 | `date_from` / `date_to` | `2026-10-01` або ISO datetime | діапазон (не з `date`) |
@@ -60,14 +60,14 @@ Query (усі опційні):
 `GET /api/v1/notifications/by-phone/{phone}`
 
 Ті самі фільтри (`status`, `date`, `hour`, `date_from`/`date_to`). У path `+` кодувати як `%2B`  
-(напр. `/by-phone/%2B380682417953`).
+(напр. `/by-phone/%2B380XXXXXXXXX`).
 
 ### Ручна відправка
 
 `POST /api/v1/notifications/send`
 
 ```json
-{ "phone": "+380682417953", "text": "текст повідомлення" }
+{ "phone": "+380XXXXXXXXX", "text": "текст повідомлення" }
 ```
 
 Статуси запису: `pending` | `sent` | `failed` | `skipped`.
