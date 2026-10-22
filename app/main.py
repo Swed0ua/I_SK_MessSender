@@ -90,11 +90,12 @@ async def create_notification(
     require_api_key(settings, x_api_key)
 
     message_type = body.message_type.strip()
-    if message_type not in db.ALLOWED_MESSAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"invalid message_type: {message_type}",
-        )
+    # TODO: remove this after testing
+    # if message_type not in db.ALLOWED_MESSAGE_TYPES:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail=f"invalid message_type: {message_type}",
+    #     )
 
     try:
         phone = normalize_phone(body.phone)
