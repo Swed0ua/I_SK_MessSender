@@ -784,6 +784,78 @@
         sessionStorage.removeItem(NAME_KEY);
       }
 
+      class AuthError extends Error {
+        constructor(message) {
+          super(message || "Сесія закінчилась");
+          this.name = "AuthError";
+        }
+      }
+
+      function readJwtPayload(tok) {
+        try {
+          const part = tok.split(".")[1];
+          if (!part) return null;
+          const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+          const json = decodeURIComponent(
+            atob(b64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+          );
+          return JSON.parse(json);
+        } catch {
+          return null;
+        }
+      }
+
+      function isTokenUnusable(tok) {
+        if (!tok || !String(tok).trim()) return true;
+        const payload = readJwtPayload(tok);
+        if (!payload) return true;
+        if (payload.exp != null && Date.now() >= Number(payload.exp) * 1000 - 3000) return true;
+        return false;
+      }
+
+      function authDetailMessage(data) {
+        const d = data?.detail ?? data;
+        if (typeof d === "string") return d;
+        if (Array.isArray(d)) return d.map(String).join("; ");
+        if (d && typeof d === "object") {
+          if (typeof d.detail === "string") return d.detail;
+          try { return JSON.stringify(d); } catch { return ""; }
+        }
+        return "";
+      }
+
+      function isAuthFailure(status, detailMsg) {
+        if (status === 401) return true;
+        const m = String(detailMsg || "").toLowerCase();
+        if (!m) return status === 403;
+        return (
+          m.includes("token expired") ||
+          m.includes("invalid token") ||
+          m.includes("invalid authorization") ||
+          m.includes("user not found") ||
+          m.includes("client not found") ||
+          m.includes("authentication credentials") ||
+          m.includes("not authenticated")
+        );
+      }
+
+      function forceLogout(reason) {
+        clearAuth();
+        closeModal();
+        closeDrawer();
+        showApp(false);
+        if (reason) showToast(reason, "bad");
+      }
+
+      function requireValidSession() {
+        const t = token();
+        if (isTokenUnusable(t)) {
+          forceLogout("Сесія закінчилась. Увійдіть знову.");
+          throw new AuthError("Сесія закінчилась. Увійдіть знову.");
+        }
+        return t;
+      }
+
       function showToast(msg, kind) {
         toastEl.textContent = msg;
         toastEl.className = "toast show" + (kind ? ` ${kind}` : "");
@@ -850,22 +922,24 @@
         if (options.body && !isForm && !headers["Content-Type"]) {
           headers["Content-Type"] = "application/json";
         }
-        const t = token();
-        if (t) headers.Authorization = `Bearer ${t}`;
+        const skipAuth = Boolean(options.skipAuth);
+        if (!skipAuth) {
+          const t = requireValidSession();
+          headers.Authorization = `Bearer ${t}`;
+        }
         const res = await fetch(API + path, { ...options, headers });
         let data = null;
         const raw = await res.text();
         try { data = raw ? JSON.parse(raw) : null; } catch { data = { detail: raw }; }
-        if (res.status === 401) {
-          clearAuth();
-          showApp(false);
-          throw new Error("Сесія закінчилась. Увійдіть знову.");
-        }
         if (!res.ok) {
-          const detail = data?.detail || data?.phone || data?.status || data?.non_field_errors;
+          const detail = authDetailMessage(data) || data?.phone || data?.status || data?.non_field_errors;
           const msg = typeof detail === "string"
             ? detail
             : (detail ? JSON.stringify(detail) : `HTTP ${res.status}`);
+          if (!skipAuth && isAuthFailure(res.status, msg)) {
+            forceLogout("Сесія закінчилась. Увійдіть знову.");
+            throw new AuthError("Сесія закінчилась. Увійдіть знову.");
+          }
           throw new Error(msg);
         }
         return data;
@@ -900,8 +974,14 @@
         viewLogin.classList.toggle("hidden", on);
         viewApp.classList.toggle("hidden", !on);
         if (on) {
+          if (isTokenUnusable(token())) {
+            forceLogout("Сесія закінчилась. Увійдіть знову.");
+            return;
+          }
           switchTab("history");
           loadList();
+        } else {
+          $("login-err").textContent = "";
         }
       }
 
@@ -956,6 +1036,11 @@
           $("btn-prev").disabled = state.page <= 1;
           $("btn-next").disabled = state.page >= pages || !data.next;
         } catch (e) {
+          if (e instanceof AuthError || e?.name === "AuthError") {
+            listHost.innerHTML = "";
+            $("pager-info").textContent = "—";
+            return;
+          }
           listHost.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
           $("pager-info").textContent = "—";
         }
@@ -1104,6 +1189,7 @@
           const title = row.querySelector(".row-title .phone");
           if (title) title.textContent = `Групова розсилка · ${results.length}`;
         } catch (e) {
+          if (e instanceof AuthError || e?.name === "AuthError") return;
           host.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
         }
       }
@@ -1146,6 +1232,7 @@
             goSend(phone);
           });
         } catch (e) {
+          if (e instanceof AuthError || e?.name === "AuthError") return;
           $("drawer-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
         }
       }
@@ -1163,27 +1250,22 @@
         $("login-err").textContent = "";
         $("login-btn").disabled = true;
         try {
-          const data = await fetch(API + "/auth/token", {
+          const data = await api("/auth/token", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            skipAuth: true,
             body: JSON.stringify({ username, password }),
-          }).then(async (res) => {
-            const body = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(body.detail || "Невірні дані");
-            return body;
           });
           setAuth(data.access_token, username);
           showApp(true);
         } catch (err) {
-          $("login-err").textContent = err.message;
+          $("login-err").textContent = err.message || "Невірні дані";
         } finally {
           $("login-btn").disabled = false;
         }
       });
 
       $("btn-logout").addEventListener("click", () => {
-        clearAuth();
-        showApp(false);
+        forceLogout();
       });
 
       document.querySelectorAll(".tab").forEach((tab) => {
@@ -1272,6 +1354,7 @@
           if (preview.invalid_count) meta += ` · пропущено ${preview.invalid_count}`;
           showFileChip(file, meta);
         } catch (err) {
+          if (err instanceof AuthError || err?.name === "AuthError") return;
           clearBulkFile();
           $("send-err").textContent = err.message;
           showToast(err.message, "bad");
@@ -1325,6 +1408,7 @@
             if (notif.status === "sent") $("send-text").value = "";
           }
         } catch (err) {
+          if (err instanceof AuthError || err?.name === "AuthError") return;
           $("send-err").textContent = err.message;
           showToast(err.message, "bad");
         } finally {
@@ -1332,8 +1416,11 @@
         }
       });
 
-      if (token()) showApp(true);
-      else showApp(false);
+      if (token() && !isTokenUnusable(token())) showApp(true);
+      else {
+        if (token()) clearAuth();
+        showApp(false);
+      }
     })();
   </script>
 </body>
