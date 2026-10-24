@@ -110,6 +110,29 @@ class ManualSendView(APIView):
         )
 
 
+class ParsePhonesView(APIView):
+    """Validate/import preview: count phones without sending."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "file is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            phones, invalid = parse_phone_file(
+                filename=upload.name or "",
+                data=upload.read(),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "total": len(phones),
+            "invalid_count": len(invalid),
+            "invalid": invalid[:20],
+        })
+
+
 class BulkSendView(APIView):
     permission_classes = [IsAuthenticated]
 

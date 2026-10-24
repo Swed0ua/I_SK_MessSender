@@ -8,6 +8,7 @@ from admin_backend.api.views import (
     ManualSendView,
     NotificationByPhoneView,
     NotificationListView,
+    ParsePhonesView,
 )
 
 urlpatterns = [
@@ -19,5 +20,6 @@ urlpatterns = [
         name="notifications-by-phone",
     ),
     path("notifications/send", ManualSendView.as_view(), name="notifications-send"),
+    path("notifications/parse-phones", ParsePhonesView.as_view(), name="notifications-parse-phones"),
     path("notifications/send-bulk", BulkSendView.as_view(), name="notifications-send-bulk"),
 ]

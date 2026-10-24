@@ -114,11 +114,126 @@
       text-transform: uppercase;
       color: var(--muted);
     }
-    .import-info {
-      font-size: 0.88rem;
-      color: var(--accent-deep);
-      min-height: 1.2em;
+    .field-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      min-height: 36px;
+      padding: 0;
+      border-radius: 999px;
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 0.95rem;
+      line-height: 1;
+    }
+    .file-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(11, 122, 117, 0.28);
+      background: linear-gradient(135deg, rgba(11, 122, 117, 0.1), rgba(45, 170, 255, 0.08));
+    }
+    .file-chip-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: var(--panel-solid);
+      color: var(--accent-deep);
+      font-weight: 800;
+      font-size: 0.72rem;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+    }
+    .file-chip-body { flex: 1; min-width: 0; }
+    .file-chip-name {
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-chip-meta { color: var(--muted); font-size: 0.86rem; margin-top: 2px; }
+    .file-chip-remove {
+      width: 34px;
+      height: 34px;
+      min-height: 34px;
+      padding: 0;
+      border-radius: 999px;
+      font-size: 1.1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* Universal modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(20, 33, 43, 0.42);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+    .modal {
+      position: fixed;
+      z-index: 61;
+      left: 50%;
+      top: 50%;
+      width: min(440px, calc(100vw - 32px));
+      max-height: min(80vh, 560px);
+      transform: translate(-50%, -46%) scale(0.96);
+      opacity: 0;
+      pointer-events: none;
+      background: var(--panel-solid);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .modal-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-head h3 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+    .modal-body {
+      overflow: auto;
+      padding: 16px 20px 22px;
+      color: var(--ink-soft);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .modal-body ul {
+      margin: 10px 0 0;
+      padding-left: 1.15em;
+    }
+    .modal-body li { margin: 6px 0; }
+    .modal-body strong { color: var(--ink); }
     .campaign-members {
       display: grid;
       gap: 8px;
@@ -561,11 +676,21 @@
           <div class="field">
             <div class="field-head">
               <label for="send-phone">Телефон</label>
-              <button type="button" class="btn btn-ghost btn-sm" id="btn-import">Імпортувати файл</button>
-              <input type="file" id="send-file" accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+              <div class="field-actions">
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-import-help" title="Як імпортувати" aria-label="Довідка імпорту">i</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-import">Імпортувати файл</button>
+                <input type="file" id="send-file" accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+              </div>
             </div>
             <input id="send-phone" placeholder="+380XXXXXXXXX" />
-            <div class="import-info" id="import-info"></div>
+            <div id="file-chip" class="file-chip hidden" aria-live="polite">
+              <div class="file-chip-icon" id="file-chip-ext">CSV</div>
+              <div class="file-chip-body">
+                <div class="file-chip-name" id="file-chip-name">—</div>
+                <div class="file-chip-meta" id="file-chip-meta">—</div>
+              </div>
+              <button type="button" class="btn btn-ghost file-chip-remove" id="btn-file-clear" title="Прибрати файл" aria-label="Прибрати файл">×</button>
+            </div>
           </div>
           <div class="field">
             <label for="send-text">Текст</label>
@@ -592,6 +717,15 @@
   </aside>
 
   <div class="toast" id="toast"></div>
+
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="modal-head">
+      <h3 id="modal-title">—</h3>
+      <button type="button" class="btn btn-ghost btn-sm btn-icon" id="modal-close" aria-label="Закрити">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
 
   <script>
     (() => {
@@ -622,6 +756,7 @@
         expandedId: null,
         filters: {},
         bulkFile: null,
+        bulkTotal: null,
       };
 
       const STATUS = {
@@ -655,6 +790,29 @@
         clearTimeout(showToast._t);
         showToast._t = setTimeout(() => toastEl.classList.remove("show"), 3200);
       }
+
+      const modalEl = $("modal");
+      const modalBackdrop = $("modal-backdrop");
+
+      function openModal({ title, bodyHtml }) {
+        $("modal-title").textContent = title || "";
+        $("modal-body").innerHTML = bodyHtml || "";
+        modalEl.classList.add("open");
+        modalBackdrop.classList.add("open");
+        modalEl.setAttribute("aria-hidden", "false");
+      }
+
+      function closeModal() {
+        modalEl.classList.remove("open");
+        modalBackdrop.classList.remove("open");
+        modalEl.setAttribute("aria-hidden", "true");
+      }
+
+      $("modal-close").addEventListener("click", closeModal);
+      modalBackdrop.addEventListener("click", closeModal);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modalEl.classList.contains("open")) closeModal();
+      });
 
       function badgeHtml(status) {
         const s = STATUS[status] || { label: status || "—", cls: "badge-skipped" };
@@ -1059,22 +1217,65 @@
 
       function clearBulkFile() {
         state.bulkFile = null;
+        state.bulkTotal = null;
         $("send-file").value = "";
-        $("import-info").textContent = "";
+        $("file-chip").classList.add("hidden");
+        $("send-phone").classList.remove("hidden");
         $("send-phone").required = true;
       }
 
+      function showFileChip(file, meta) {
+        const ext = (file.name.split(".").pop() || "FILE").toUpperCase().slice(0, 4);
+        $("file-chip-ext").textContent = ext;
+        $("file-chip-name").textContent = file.name;
+        $("file-chip-meta").textContent = meta;
+        $("send-phone").classList.add("hidden");
+        $("send-phone").required = false;
+        $("send-phone").value = "";
+        $("file-chip").classList.remove("hidden");
+      }
+
+      $("btn-import-help").addEventListener("click", () => {
+        openModal({
+          title: "Імпорт номерів",
+          bodyHtml: `
+            <p>Завантажте файл зі списком телефонів для <strong>групової розсилки</strong>.</p>
+            <ul>
+              <li><strong>Формати:</strong> <code>.csv</code>, <code>.xlsx</code>, <code>.txt</code></li>
+              <li><strong>Ліміт:</strong> до 500 номерів у одному файлі</li>
+              <li><strong>Стовпчик:</strong> назвіть <code>phone</code> / <code>телефон</code> або просто перелік номерів у будь-яких клітинках</li>
+              <li><strong>Формат номера:</strong> UA, нормалізується до <code>+380…</code> (напр. <code>067…</code>, <code>380…</code>)</li>
+              <li>Дублікати прибираються; невалідні рядки пропускаються</li>
+              <li>Один текст іде на всі номери; у історії — одна <strong>Групова розсилка</strong> (сесія), яку можна розгорнути</li>
+            </ul>`,
+        });
+      });
+
       $("btn-import").addEventListener("click", () => $("send-file").click());
-      $("send-file").addEventListener("change", () => {
+      $("btn-file-clear").addEventListener("click", clearBulkFile);
+
+      $("send-file").addEventListener("change", async () => {
         const file = $("send-file").files?.[0] || null;
-        state.bulkFile = file;
         if (!file) {
           clearBulkFile();
           return;
         }
-        $("send-phone").required = false;
-        $("send-phone").value = "";
-        $("import-info").textContent = `Файл: ${file.name} · розсилка на всі номери з файлу`;
+        state.bulkFile = file;
+        showFileChip(file, "Перевірка номерів…");
+        $("send-err").textContent = "";
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const preview = await api("/notifications/parse-phones", { method: "POST", body: fd });
+          state.bulkTotal = preview.total;
+          let meta = `${preview.total} номерів знайдено`;
+          if (preview.invalid_count) meta += ` · пропущено ${preview.invalid_count}`;
+          showFileChip(file, meta);
+        } catch (err) {
+          clearBulkFile();
+          $("send-err").textContent = err.message;
+          showToast(err.message, "bad");
+        }
       });
 
       $("send-form").addEventListener("submit", async (e) => {

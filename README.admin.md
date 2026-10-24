@@ -129,6 +129,8 @@ Query (усі опційні):
 
 ### Групова розсилка (CSV / XLSX)
 
+`POST /api/v1/notifications/parse-phones` — лише `file` → `{ total, invalid_count }` (прев’ю без відправки).
+
 `POST /api/v1/notifications/send-bulk` — `multipart/form-data`:
 
 | Поле | Опис |
