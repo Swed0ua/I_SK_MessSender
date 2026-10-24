@@ -4,6 +4,7 @@ from django.urls import path
 
 from admin_backend.api.views import (
     AuthTokenView,
+    BulkSendView,
     ManualSendView,
     NotificationByPhoneView,
     NotificationListView,
@@ -18,4 +19,5 @@ urlpatterns = [
         name="notifications-by-phone",
     ),
     path("notifications/send", ManualSendView.as_view(), name="notifications-send"),
+    path("notifications/send-bulk", BulkSendView.as_view(), name="notifications-send-bulk"),
 ]

@@ -68,6 +68,10 @@ def apply_notification_filters(qs: QuerySet, params: Any, *, force_phone: str | 
         except PhoneError as exc:
             raise ValidationError({"phone": str(exc)}) from exc
 
+    campaign_id = (params.get("campaign_id") or "").strip()
+    if campaign_id:
+        qs = qs.filter(payload__campaign_id=campaign_id)
+
     date_raw = params.get("date")
     hour_raw = params.get("hour")
     date_from = params.get("date_from")

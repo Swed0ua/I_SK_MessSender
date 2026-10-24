@@ -127,4 +127,17 @@ Query (усі опційні):
 { "phone": "+380XXXXXXXXX", "text": "текст повідомлення" }
 ```
 
+### Групова розсилка (CSV / XLSX)
+
+`POST /api/v1/notifications/send-bulk` — `multipart/form-data`:
+
+| Поле | Опис |
+|------|------|
+| `text` | текст повідомлення |
+| `file` | `.csv` / `.xlsx` з телефонами (до 500) |
+
+Відповідь `202`: `{ campaign_id, total, invalid_count, invalid }`.  
+Відправка послідовна у фоні. У історії групається по `payload.campaign_id`  
+(`GET /notifications?campaign_id=...` — усі номери сесії).
+
 Статуси запису: `pending` | `sent` | `failed` | `skipped`.

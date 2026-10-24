@@ -100,12 +100,40 @@
       line-height: 1.45;
     }
     .field { display: grid; gap: 7px; margin-bottom: 14px; }
+    .field-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .field-head label { margin: 0; }
     .field label {
       font-size: 0.78rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: var(--muted);
+    }
+    .import-info {
+      font-size: 0.88rem;
+      color: var(--accent-deep);
+      min-height: 1.2em;
+    }
+    .campaign-members {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .campaign-member {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--line);
+      font-size: 0.9rem;
     }
     .field input, .field select, .field textarea,
     .filters input, .filters select {
@@ -531,8 +559,13 @@
         </div>
         <form class="send-wrap" id="send-form">
           <div class="field">
-            <label for="send-phone">Телефон</label>
-            <input id="send-phone" required placeholder="+380XXXXXXXXX" />
+            <div class="field-head">
+              <label for="send-phone">Телефон</label>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-import">Імпортувати файл</button>
+              <input type="file" id="send-file" accept=".csv,.xlsx,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+            </div>
+            <input id="send-phone" placeholder="+380XXXXXXXXX" />
+            <div class="import-info" id="import-info"></div>
           </div>
           <div class="field">
             <label for="send-text">Текст</label>
@@ -588,6 +621,7 @@
         pageSize: 20,
         expandedId: null,
         filters: {},
+        bulkFile: null,
       };
 
       const STATUS = {
@@ -654,7 +688,8 @@
 
       async function api(path, options = {}) {
         const headers = Object.assign({ Accept: "application/json" }, options.headers || {});
-        if (options.body && !headers["Content-Type"]) {
+        const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+        if (options.body && !isForm && !headers["Content-Type"]) {
           headers["Content-Type"] = "application/json";
         }
         const t = token();
@@ -676,6 +711,31 @@
           throw new Error(msg);
         }
         return data;
+      }
+
+      function campaignIdOf(n) {
+        return n?.payload?.campaign_id || null;
+      }
+
+      function groupFeed(items) {
+        const out = [];
+        const seen = new Set();
+        for (const n of items) {
+          const cid = campaignIdOf(n);
+          if (!cid) {
+            out.push({ kind: "single", item: n });
+            continue;
+          }
+          if (seen.has(cid)) continue;
+          seen.add(cid);
+          out.push({
+            kind: "campaign",
+            campaignId: cid,
+            item: n,
+            countOnPage: items.filter((x) => campaignIdOf(x) === cid).length,
+          });
+        }
+        return out;
       }
 
       function showApp(on) {
@@ -748,9 +808,16 @@
           listHost.innerHTML = `<div class="empty">Нічого не знайдено</div>`;
           return;
         }
-        listHost.innerHTML = `<ul class="list">${items.map(rowHtml).join("")}</ul>`;
+        const groups = groupFeed(items);
+        listHost.innerHTML = `<ul class="list">${groups.map((g) =>
+          g.kind === "campaign" ? campaignRowHtml(g) : rowHtml(g.item)
+        ).join("")}</ul>`;
         listHost.querySelectorAll("[data-expand]").forEach((btn) => {
-          btn.addEventListener("click", () => toggleExpand(btn.closest(".row")));
+          btn.addEventListener("click", () => {
+            const row = btn.closest(".row");
+            if (row?.dataset.campaignId) toggleCampaignExpand(row);
+            else toggleExpand(row);
+          });
         });
         listHost.querySelectorAll("[data-by-phone]").forEach((btn) => {
           btn.addEventListener("click", (ev) => {
@@ -766,7 +833,10 @@
         });
         if (state.expandedId) {
           const row = listHost.querySelector(`[data-id="${CSS.escape(state.expandedId)}"]`);
-          if (row) row.classList.add("open");
+          if (row) {
+            row.classList.add("open");
+            if (row.dataset.campaignId) loadCampaignMembers(row);
+          }
         }
       }
 
@@ -799,6 +869,32 @@
           </li>`;
       }
 
+      function campaignRowHtml(g) {
+        const n = g.item;
+        const id = `campaign:${g.campaignId}`;
+        const open = state.expandedId === id ? " open" : "";
+        return `
+          <li class="row${open}" data-id="${esc(id)}" data-campaign-id="${esc(g.campaignId)}">
+            <button type="button" class="row-main" data-expand>
+              <div>
+                <div class="row-title">
+                  <span class="phone">Групова розсилка</span>
+                  <span class="meta">${fmtTime(n.created_at)}</span>
+                </div>
+                <div class="row-sub">${esc(previewText(n))}</div>
+              </div>
+              <span class="badge badge-pending">Сесія</span>
+            </button>
+            <div class="detail">
+              <div class="detail-grid">
+                <div class="kv"><span>Текст</span><pre>${esc(previewText(n) || "—")}</pre></div>
+                <div class="kv"><span>Campaign</span><div class="meta">${esc(g.campaignId)}</div></div>
+                <div class="campaign-members" data-host></div>
+              </div>
+            </div>
+          </li>`;
+      }
+
       function toggleExpand(row) {
         if (!row) return;
         const id = row.dataset.id;
@@ -809,6 +905,48 @@
           state.expandedId = id;
         } else {
           state.expandedId = null;
+        }
+      }
+
+      async function toggleCampaignExpand(row) {
+        if (!row) return;
+        const id = row.dataset.id;
+        const was = row.classList.contains("open");
+        listHost.querySelectorAll(".row.open").forEach((r) => r.classList.remove("open"));
+        if (was) {
+          state.expandedId = null;
+          return;
+        }
+        row.classList.add("open");
+        state.expandedId = id;
+        await loadCampaignMembers(row);
+      }
+
+      async function loadCampaignMembers(row) {
+        const host = row.querySelector("[data-host]");
+        const cid = row.dataset.campaignId;
+        if (!host || !cid || host.dataset.loaded === "1") return;
+        host.innerHTML = `<div class="loading">Завантаження номерів…</div>`;
+        try {
+          const data = await api(`/notifications${qs({ campaign_id: cid })}`);
+          const results = Array.isArray(data) ? data : (data.results || []);
+          if (!results.length) {
+            host.innerHTML = `<div class="empty">Порожньо</div>`;
+            return;
+          }
+          host.innerHTML = results.map((n) => `
+            <div class="campaign-member">
+              <div>
+                <div class="phone">${esc(n.phone)}</div>
+                ${n.error ? `<div class="meta" style="color:var(--failed)">${esc(n.error)}</div>` : ""}
+              </div>
+              ${badgeHtml(n.status)}
+            </div>`).join("");
+          host.dataset.loaded = "1";
+          const title = row.querySelector(".row-title .phone");
+          if (title) title.textContent = `Групова розсилка · ${results.length}`;
+        } catch (e) {
+          host.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
         }
       }
 
@@ -919,34 +1057,72 @@
       $("drawer-close").addEventListener("click", closeDrawer);
       drawerBackdrop.addEventListener("click", closeDrawer);
 
+      function clearBulkFile() {
+        state.bulkFile = null;
+        $("send-file").value = "";
+        $("import-info").textContent = "";
+        $("send-phone").required = true;
+      }
+
+      $("btn-import").addEventListener("click", () => $("send-file").click());
+      $("send-file").addEventListener("change", () => {
+        const file = $("send-file").files?.[0] || null;
+        state.bulkFile = file;
+        if (!file) {
+          clearBulkFile();
+          return;
+        }
+        $("send-phone").required = false;
+        $("send-phone").value = "";
+        $("import-info").textContent = `Файл: ${file.name} · розсилка на всі номери з файлу`;
+      });
+
       $("send-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         $("send-err").textContent = "";
         $("send-result").classList.add("hidden");
         $("send-btn").disabled = true;
+        const text = $("send-text").value;
         try {
-          const notif = await api("/notifications/send", {
-            method: "POST",
-            body: JSON.stringify({
-              phone: $("send-phone").value.trim(),
-              text: $("send-text").value,
-            }),
-          });
-          $("send-result").classList.remove("hidden");
-          $("send-result").innerHTML = `
-            <div class="detail-grid">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-                <strong>${esc(notif.phone)}</strong>
-                ${badgeHtml(notif.status)}
-              </div>
-              <div class="kv"><span>Текст</span><pre>${esc(notif.payload?.text || "")}</pre></div>
-              ${notif.error ? `<div class="kv"><span>Помилка</span><pre>${esc(notif.error)}</pre></div>` : ""}
-            </div>`;
-          showToast(
-            notif.status === "sent" ? "Повідомлення надіслано" : `Статус: ${STATUS[notif.status]?.label || notif.status}`,
-            notif.status === "sent" ? "ok" : (notif.status === "failed" ? "bad" : "")
-          );
-          if (notif.status === "sent") $("send-text").value = "";
+          if (state.bulkFile) {
+            const fd = new FormData();
+            fd.append("text", text);
+            fd.append("file", state.bulkFile);
+            const result = await api("/notifications/send-bulk", { method: "POST", body: fd });
+            $("send-result").classList.remove("hidden");
+            $("send-result").innerHTML = `
+              <div class="detail-grid">
+                <strong>Розсилку запущено</strong>
+                <div class="kv"><span>Номерів</span><div>${esc(result.total)}</div></div>
+                <div class="kv"><span>Campaign</span><div class="meta">${esc(result.campaign_id)}</div></div>
+                ${result.invalid_count ? `<div class="kv"><span>Пропущено</span><div>${esc(result.invalid_count)}</div></div>` : ""}
+              </div>`;
+            showToast(`Розсилка: ${result.total} номерів`, "ok");
+            clearBulkFile();
+            $("send-text").value = "";
+          } else {
+            const phone = $("send-phone").value.trim();
+            if (!phone) throw new Error("Вкажіть телефон або імпортуйте файл");
+            const notif = await api("/notifications/send", {
+              method: "POST",
+              body: JSON.stringify({ phone, text }),
+            });
+            $("send-result").classList.remove("hidden");
+            $("send-result").innerHTML = `
+              <div class="detail-grid">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+                  <strong>${esc(notif.phone)}</strong>
+                  ${badgeHtml(notif.status)}
+                </div>
+                <div class="kv"><span>Текст</span><pre>${esc(notif.payload?.text || "")}</pre></div>
+                ${notif.error ? `<div class="kv"><span>Помилка</span><pre>${esc(notif.error)}</pre></div>` : ""}
+              </div>`;
+            showToast(
+              notif.status === "sent" ? "Повідомлення надіслано" : `Статус: ${STATUS[notif.status]?.label || notif.status}`,
+              notif.status === "sent" ? "ok" : (notif.status === "failed" ? "bad" : "")
+            );
+            if (notif.status === "sent") $("send-text").value = "";
+          }
         } catch (err) {
           $("send-err").textContent = err.message;
           showToast(err.message, "bad");

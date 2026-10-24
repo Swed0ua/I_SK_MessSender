@@ -20,7 +20,8 @@ from admin_backend.api.serializers import (
     ManualSendSerializer,
     NotificationSerializer,
 )
-from admin_backend.api.services import send_manual_message
+from admin_backend.api.phone_file import parse_phone_file
+from admin_backend.api.services import enqueue_bulk_campaign, send_manual_message
 from app.phone import PhoneError, normalize_phone
 
 
@@ -56,6 +57,12 @@ class AuthTokenView(APIView):
 class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = NotificationSerializer
+
+    def paginate_queryset(self, queryset):
+        # Full campaign dump for history expand.
+        if (self.request.query_params.get("campaign_id") or "").strip():
+            return None
+        return super().paginate_queryset(queryset)
 
     def get_queryset(self):
         return apply_notification_filters(
@@ -101,3 +108,33 @@ class ManualSendView(APIView):
             NotificationSerializer(notif).data,
             status=status.HTTP_202_ACCEPTED if notif.status == "pending" else status.HTTP_200_OK,
         )
+
+
+class BulkSendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        text = (request.data.get("text") or "").strip()
+        if not text:
+            return Response({"detail": "text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(text) > 4000:
+            return Response({"detail": "text too long"}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "file is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            phones, invalid = parse_phone_file(
+                filename=upload.name or "",
+                data=upload.read(),
+            )
+            result = enqueue_bulk_campaign(phones=phones, text=text)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        result["invalid"] = invalid[:50]
+        result["invalid_count"] = len(invalid)
+        return Response(result, status=status.HTTP_202_ACCEPTED)
