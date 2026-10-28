@@ -8,7 +8,7 @@ from typing import Iterable
 from app.phone import PhoneError, normalize_phone
 
 _PHONEISH = re.compile(r"[\d+][\d\s\-()]{7,20}")
-BULK_MAX_PHONES = 500
+BULK_MAX_PHONES = 1000
 
 
 def _cells_from_csv(data: bytes) -> Iterable[str]:
