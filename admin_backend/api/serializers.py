@@ -50,4 +50,14 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 class ManualSendSerializer(serializers.Serializer):
     phone = serializers.CharField(min_length=1, max_length=32)
-    text = serializers.CharField(min_length=1, max_length=4000)
+    text = serializers.CharField(required=False, allow_blank=True, max_length=4000, default="")
+    image_url = serializers.URLField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        text = (attrs.get("text") or "").strip()
+        image_url = (attrs.get("image_url") or "").strip()
+        if not text and not image_url:
+            raise serializers.ValidationError("text or image_url is required")
+        attrs["text"] = text
+        attrs["image_url"] = image_url
+        return attrs

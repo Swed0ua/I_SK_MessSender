@@ -694,7 +694,22 @@
           </div>
           <div class="field">
             <label for="send-text">Текст</label>
-            <textarea id="send-text" required maxlength="4000" placeholder="Текст повідомлення"></textarea>
+            <textarea id="send-text" maxlength="4000" placeholder="Текст повідомлення"></textarea>
+          </div>
+          <div class="field">
+            <div class="field-head">
+              <label>Фото</label>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-photo">Додати фото</button>
+              <input type="file" id="send-photo" accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif" hidden />
+            </div>
+            <div id="photo-chip" class="file-chip hidden" aria-live="polite">
+              <div class="file-chip-icon" id="photo-chip-ext">IMG</div>
+              <div class="file-chip-body">
+                <div class="file-chip-name" id="photo-chip-name">—</div>
+                <div class="file-chip-meta" id="photo-chip-meta">—</div>
+              </div>
+              <button type="button" class="btn btn-ghost file-chip-remove" id="btn-photo-clear" title="Прибрати фото" aria-label="Прибрати фото">×</button>
+            </div>
           </div>
           <button class="btn btn-primary" type="submit" id="send-btn">Надіслати</button>
           <div class="err" id="send-err"></div>
@@ -757,6 +772,8 @@
         filters: {},
         bulkFile: null,
         bulkTotal: null,
+        imageUrl: null,
+        photoName: null,
       };
 
       const STATUS = {
@@ -1333,6 +1350,50 @@
         });
       });
 
+      function clearPhoto() {
+        state.imageUrl = null;
+        state.photoName = null;
+        $("send-photo").value = "";
+        $("photo-chip").classList.add("hidden");
+      }
+
+      function showPhotoChip(name, meta) {
+        const ext = (name.split(".").pop() || "IMG").toUpperCase().slice(0, 4);
+        $("photo-chip-ext").textContent = ext;
+        $("photo-chip-name").textContent = name;
+        $("photo-chip-meta").textContent = meta;
+        $("photo-chip").classList.remove("hidden");
+      }
+
+      $("btn-photo").addEventListener("click", () => $("send-photo").click());
+      $("btn-photo-clear").addEventListener("click", clearPhoto);
+      $("send-photo").addEventListener("change", async () => {
+        const file = $("send-photo").files?.[0] || null;
+        if (!file) {
+          clearPhoto();
+          return;
+        }
+        showPhotoChip(file.name, "Завантаження на Google Drive…");
+        $("send-err").textContent = "";
+        $("btn-photo").disabled = true;
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const up = await api("/media/upload", { method: "POST", body: fd });
+          state.imageUrl = up.url;
+          state.photoName = file.name;
+          showPhotoChip(file.name, "Готово · посилання додасться до повідомлення");
+          showToast("Фото завантажено", "ok");
+        } catch (err) {
+          if (err instanceof AuthError || err?.name === "AuthError") return;
+          clearPhoto();
+          $("send-err").textContent = err.message;
+          showToast(err.message, "bad");
+        } finally {
+          $("btn-photo").disabled = false;
+        }
+      });
+
       $("btn-import").addEventListener("click", () => $("send-file").click());
       $("btn-file-clear").addEventListener("click", clearBulkFile);
 
@@ -1367,11 +1428,14 @@
         $("send-result").classList.add("hidden");
         $("send-btn").disabled = true;
         const text = $("send-text").value;
+        const imageUrl = state.imageUrl || "";
         try {
+          if (!text.trim() && !imageUrl) throw new Error("Вкажіть текст або фото");
           if (state.bulkFile) {
             const fd = new FormData();
             fd.append("text", text);
             fd.append("file", state.bulkFile);
+            if (imageUrl) fd.append("image_url", imageUrl);
             const result = await api("/notifications/send-bulk", { method: "POST", body: fd });
             $("send-result").classList.remove("hidden");
             $("send-result").innerHTML = `
@@ -1379,17 +1443,21 @@
                 <strong>Розсилку запущено</strong>
                 <div class="kv"><span>Номерів</span><div>${esc(result.total)}</div></div>
                 <div class="kv"><span>Campaign</span><div class="meta">${esc(result.campaign_id)}</div></div>
+                ${result.image_url ? `<div class="kv"><span>Фото</span><div class="meta">${esc(result.image_url)}</div></div>` : ""}
                 ${result.invalid_count ? `<div class="kv"><span>Пропущено</span><div>${esc(result.invalid_count)}</div></div>` : ""}
               </div>`;
             showToast(`Розсилка: ${result.total} номерів`, "ok");
             clearBulkFile();
+            clearPhoto();
             $("send-text").value = "";
           } else {
             const phone = $("send-phone").value.trim();
             if (!phone) throw new Error("Вкажіть телефон або імпортуйте файл");
+            const body = { phone, text };
+            if (imageUrl) body.image_url = imageUrl;
             const notif = await api("/notifications/send", {
               method: "POST",
-              body: JSON.stringify({ phone, text }),
+              body: JSON.stringify(body),
             });
             $("send-result").classList.remove("hidden");
             $("send-result").innerHTML = `
@@ -1399,13 +1467,17 @@
                   ${badgeHtml(notif.status)}
                 </div>
                 <div class="kv"><span>Текст</span><pre>${esc(notif.payload?.text || "")}</pre></div>
+                ${notif.payload?.image_url ? `<div class="kv"><span>Фото</span><div class="meta">${esc(notif.payload.image_url)}</div></div>` : ""}
                 ${notif.error ? `<div class="kv"><span>Помилка</span><pre>${esc(notif.error)}</pre></div>` : ""}
               </div>`;
             showToast(
               notif.status === "sent" ? "Повідомлення надіслано" : `Статус: ${STATUS[notif.status]?.label || notif.status}`,
               notif.status === "sent" ? "ok" : (notif.status === "failed" ? "bad" : "")
             );
-            if (notif.status === "sent") $("send-text").value = "";
+            if (notif.status === "sent") {
+              $("send-text").value = "";
+              clearPhoto();
+            }
           }
         } catch (err) {
           if (err instanceof AuthError || err?.name === "AuthError") return;

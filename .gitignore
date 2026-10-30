@@ -8,3 +8,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 *.log
+client_secret.json
+token.json
+google_token.json

@@ -6,6 +6,7 @@ from admin_backend.api.views import (
     AuthTokenView,
     BulkSendView,
     ManualSendView,
+    MediaUploadView,
     NotificationByPhoneView,
     NotificationListView,
     ParsePhonesView,
@@ -13,6 +14,7 @@ from admin_backend.api.views import (
 
 urlpatterns = [
     path("auth/token", AuthTokenView.as_view(), name="auth-token"),
+    path("media/upload", MediaUploadView.as_view(), name="media-upload"),
     path("notifications", NotificationListView.as_view(), name="notifications-list"),
     path(
         "notifications/by-phone/<str:phone>",

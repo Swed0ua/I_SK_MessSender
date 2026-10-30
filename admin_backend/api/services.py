@@ -24,9 +24,25 @@ def _require_mailing_url() -> str:
     return url
 
 
-def _new_notification(*, phone: str, text: str, campaign_id: str | None) -> Notification:
+def build_message_context(text: str, image_url: str | None = None) -> str:
+    text = (text or "").strip()
+    image_url = (image_url or "").strip()
+    if image_url:
+        return f"{text}\n\n{image_url}" if text else image_url
+    return text
+
+
+def _new_notification(
+    *,
+    phone: str,
+    text: str,
+    campaign_id: str | None,
+    image_url: str | None = None,
+) -> Notification:
     now = timezone.now()
     payload: dict[str, Any] = {"text": text, "source": "admin"}
+    if image_url:
+        payload["image_url"] = image_url
     if campaign_id:
         payload["campaign_id"] = campaign_id
         payload["source"] = "admin_bulk"
@@ -74,27 +90,47 @@ def _deliver(notif: Notification, *, text: str, webhook_url: str) -> None:
     notif.save(update_fields=["status", "provider_response", "error", "sent_at", "updated_at"])
 
 
-def send_manual_message(*, phone_raw: str, text: str) -> Notification:
+def send_manual_message(*, phone_raw: str, text: str, image_url: str | None = None) -> Notification:
     webhook_url = _require_mailing_url()
     try:
         phone = normalize_phone(phone_raw)
     except PhoneError as exc:
         raise ValueError(str(exc)) from exc
 
-    notif = _new_notification(phone=phone, text=text, campaign_id=None)
+    image_url = (image_url or "").strip() or None
+    context = build_message_context(text, image_url)
+    if not context:
+        raise ValueError("text or image is required")
+
+    notif = _new_notification(phone=phone, text=text, campaign_id=None, image_url=image_url)
     notif.save(force_insert=True)
-    _deliver(notif, text=text, webhook_url=webhook_url)
+    _deliver(notif, text=context, webhook_url=webhook_url)
     return notif
 
 
-def enqueue_bulk_campaign(*, phones: list[str], text: str) -> dict[str, Any]:
+def enqueue_bulk_campaign(
+    *,
+    phones: list[str],
+    text: str,
+    image_url: str | None = None,
+) -> dict[str, Any]:
     """Insert pending rows and send sequentially in a background thread."""
     webhook_url = _require_mailing_url()
+    image_url = (image_url or "").strip() or None
+    context = build_message_context(text, image_url)
+    if not context:
+        raise ValueError("text or image is required")
+
     campaign_id = str(uuid.uuid4())
     ids: list[uuid.UUID] = []
 
     for phone in phones:
-        notif = _new_notification(phone=phone, text=text, campaign_id=campaign_id)
+        notif = _new_notification(
+            phone=phone,
+            text=text,
+            campaign_id=campaign_id,
+            image_url=image_url,
+        )
         notif.save(force_insert=True)
         ids.append(notif.id)
 
@@ -107,10 +143,10 @@ def enqueue_bulk_campaign(*, phones: list[str], text: str) -> dict[str, Any]:
                 notif = Notification.objects.filter(id=notif_id).first()
                 if notif is None:
                     continue
-                _deliver(notif, text=text, webhook_url=webhook_url)
+                _deliver(notif, text=context, webhook_url=webhook_url)
         finally:
             close_old_connections()
 
     threading.Thread(target=_run, name=f"bulk-{campaign_id[:8]}", daemon=True).start()
     logger.info("admin_bulk_enqueued campaign_id=%s count=%s", campaign_id, len(ids))
-    return {"campaign_id": campaign_id, "total": len(ids), "status": "pending"}
+    return {"campaign_id": campaign_id, "total": len(ids), "status": "pending", "image_url": image_url}

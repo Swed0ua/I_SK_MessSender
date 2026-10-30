@@ -65,6 +65,11 @@ ADMIN_HOST = os.getenv("ADMIN_HOST", "127.0.0.1").strip() or "127.0.0.1"
 ADMIN_PORT = int(os.getenv("ADMIN_PORT", "8081"))
 MYCHATBOT_MAILING_WEBHOOK_URL = os.getenv("MYCHATBOT_MAILING_WEBHOOK_URL", "").strip()
 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN", "").strip()
+GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "").strip()
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "admin_backend.api.auth.JWTAuthentication",

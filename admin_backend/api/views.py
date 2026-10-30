@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -13,16 +15,19 @@ from admin_backend.api.auth import (
     issue_jwt,
     verify_password,
 )
+from admin_backend.api.drive import upload_public_image
 from admin_backend.api.filters import apply_notification_filters
 from admin_backend.api.models import AdminClient, AdminUser, Notification
+from admin_backend.api.phone_file import parse_phone_file
 from admin_backend.api.serializers import (
     AuthTokenSerializer,
     ManualSendSerializer,
     NotificationSerializer,
 )
-from admin_backend.api.phone_file import parse_phone_file
 from admin_backend.api.services import enqueue_bulk_campaign, send_manual_message
 from app.phone import PhoneError, normalize_phone
+
+logger = logging.getLogger(__name__)
 
 
 class AuthTokenView(APIView):
@@ -98,6 +103,7 @@ class ManualSendView(APIView):
             notif = send_manual_message(
                 phone_raw=serializer.validated_data["phone"],
                 text=serializer.validated_data["text"],
+                image_url=serializer.validated_data.get("image_url") or None,
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -108,6 +114,29 @@ class ManualSendView(APIView):
             NotificationSerializer(notif).data,
             status=status.HTTP_202_ACCEPTED if notif.status == "pending" else status.HTTP_200_OK,
         )
+
+
+class MediaUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "file is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = upload_public_image(
+                filename=upload.name or "upload.jpg",
+                data=upload.read(),
+                content_type=getattr(upload, "content_type", None),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception:
+            logger.exception("drive_upload_failed")
+            return Response({"detail": "drive upload failed"}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result, status=status.HTTP_201_CREATED)
 
 
 class ParsePhonesView(APIView):
@@ -138,8 +167,9 @@ class BulkSendView(APIView):
 
     def post(self, request):
         text = (request.data.get("text") or "").strip()
-        if not text:
-            return Response({"detail": "text is required"}, status=status.HTTP_400_BAD_REQUEST)
+        image_url = (request.data.get("image_url") or "").strip()
+        if not text and not image_url:
+            return Response({"detail": "text or image_url is required"}, status=status.HTTP_400_BAD_REQUEST)
         if len(text) > 4000:
             return Response({"detail": "text too long"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -152,7 +182,7 @@ class BulkSendView(APIView):
                 filename=upload.name or "",
                 data=upload.read(),
             )
-            result = enqueue_bulk_campaign(phones=phones, text=text)
+            result = enqueue_bulk_campaign(phones=phones, text=text, image_url=image_url or None)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except RuntimeError as exc:

@@ -74,6 +74,20 @@ py manage_admin.py delete_admin_client --name postman-dev
 | `ADMIN_SECRET_KEY` | Django secret |
 | `ADMIN_JWT_SECRET` | підпис JWT (fallback → `ADMIN_SECRET_KEY`) |
 | `ADMIN_JWT_TTL_SECONDS` | default `86400` |
+| `GOOGLE_CLIENT_ID` | OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | OAuth Client Secret |
+| `GOOGLE_REFRESH_TOKEN` | з `scripts/get_google_refresh_token.py` |
+| `GOOGLE_DRIVE_FOLDER_ID` | id папки Drive для фото |
+
+### Google Drive (фото)
+
+```bash
+pip install -r requirements.txt
+# client_secret.json у корені проєкту (gitignore)
+py scripts/get_google_refresh_token.py
+```
+
+Додай у `.env` надруковані `GOOGLE_*` і `GOOGLE_DRIVE_FOLDER_ID`.
 
 ## Auth
 
@@ -119,13 +133,21 @@ Query (усі опційні):
 Ті самі фільтри (`status`, `date`, `hour`, `date_from`/`date_to`). У path `+` кодувати як `%2B`  
 (напр. `/by-phone/%2B380XXXXXXXXX`).
 
+### Завантаження фото (Drive)
+
+`POST /api/v1/media/upload` — `multipart/form-data`, поле `file` (jpeg/png/webp/gif).
+
+Відповідь: `{ file_id, url }` де `url` = `https://lh3.googleusercontent.com/d/<id>`.
+
 ### Ручна відправка
 
 `POST /api/v1/notifications/send`
 
 ```json
-{ "phone": "+380XXXXXXXXX", "text": "текст повідомлення" }
+{ "phone": "+380XXXXXXXXX", "text": "текст", "image_url": "https://lh3.googleusercontent.com/d/..." }
 ```
+
+`image_url` опційний; дописується в кінець `context` для MyChatbot/Viber.
 
 ### Групова розсилка (CSV / XLSX)
 
@@ -137,6 +159,7 @@ Query (усі опційні):
 |------|------|
 | `text` | текст повідомлення |
 | `file` | `.csv` / `.xlsx` з телефонами (до 1000) |
+| `image_url` | опційно, той самий URL на всі номери |
 
 Відповідь `202`: `{ campaign_id, total, invalid_count, invalid }`.  
 Відправка послідовна у фоні. У історії групається по `payload.campaign_id`  
