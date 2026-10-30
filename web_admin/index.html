@@ -153,6 +153,36 @@
       flex-shrink: 0;
       border: 1px solid var(--line);
     }
+    .photo-chip-thumb {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      padding: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      background: var(--panel-solid);
+      cursor: pointer;
+    }
+    .photo-chip-thumb:disabled {
+      cursor: default;
+      opacity: 0.7;
+    }
+    .photo-chip-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .modal-preview-img {
+      display: block;
+      width: 100%;
+      max-height: min(70vh, 560px);
+      object-fit: contain;
+      border-radius: 12px;
+      background: #0f1720;
+    }
     .file-chip-body { flex: 1; min-width: 0; }
     .file-chip-name {
       font-weight: 700;
@@ -170,6 +200,27 @@
       font-size: 1.1rem;
       line-height: 1;
       flex-shrink: 0;
+    }
+    .url-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .url-row input {
+      flex: 1;
+      min-width: 0;
+    }
+    .url-row input:disabled {
+      opacity: 0.85;
+      background: #f0f4f6;
+      cursor: default;
+    }
+    .btn-copy {
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      flex-shrink: 0;
+      font-size: 1.05rem;
     }
 
     /* Universal modal */
@@ -699,16 +750,26 @@
           <div class="field">
             <div class="field-head">
               <label>Фото</label>
-              <button type="button" class="btn btn-ghost btn-sm" id="btn-photo">Додати фото</button>
-              <input type="file" id="send-photo" accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif" hidden />
+              <div class="field-actions">
+                <button type="button" class="btn btn-ghost btn-sm btn-icon" id="btn-photo-help" title="Як додати фото" aria-label="Довідка фото">i</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-photo">Додати фото</button>
+                <input type="file" id="send-photo" accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif" hidden />
+              </div>
             </div>
             <div id="photo-chip" class="file-chip hidden" aria-live="polite">
-              <div class="file-chip-icon" id="photo-chip-ext">IMG</div>
+              <button type="button" class="photo-chip-thumb" id="btn-photo-preview" title="Переглянути" aria-label="Переглянути фото" disabled>
+                <img id="photo-chip-img" alt="" />
+              </button>
               <div class="file-chip-body">
                 <div class="file-chip-name" id="photo-chip-name">—</div>
                 <div class="file-chip-meta" id="photo-chip-meta">—</div>
               </div>
               <button type="button" class="btn btn-ghost file-chip-remove" id="btn-photo-clear" title="Прибрати фото" aria-label="Прибрати фото">×</button>
+            </div>
+            <label for="photo-url" style="margin-top:8px">URL фото</label>
+            <div class="url-row">
+              <input id="photo-url" type="url" placeholder="https://…" autocomplete="off" />
+              <button type="button" class="btn btn-ghost btn-copy hidden" id="btn-photo-copy" title="Копіювати" aria-label="Копіювати URL">⧉</button>
             </div>
           </div>
           <button class="btn btn-primary" type="submit" id="send-btn">Надіслати</button>
@@ -774,6 +835,8 @@
         bulkTotal: null,
         imageUrl: null,
         photoName: null,
+        photoLocked: false,
+        photoObjectUrl: null,
       };
 
       const STATUS = {
@@ -1314,6 +1377,23 @@
       $("drawer-close").addEventListener("click", closeDrawer);
       drawerBackdrop.addEventListener("click", closeDrawer);
 
+      function syncAttachButtons() {
+        const busy = Boolean(state.bulkFile) || Boolean(state.photoName) || state.photoLocked;
+        $("btn-import").disabled = busy;
+        $("btn-photo").disabled = busy;
+      }
+
+      function setPhotoUrl(url, { locked }) {
+        const input = $("photo-url");
+        const copyBtn = $("btn-photo-copy");
+        input.value = url || "";
+        state.imageUrl = (url || "").trim() || null;
+        state.photoLocked = Boolean(locked && state.imageUrl);
+        input.disabled = state.photoLocked;
+        copyBtn.classList.toggle("hidden", !state.photoLocked);
+        syncAttachButtons();
+      }
+
       function clearBulkFile() {
         state.bulkFile = null;
         state.bulkTotal = null;
@@ -1321,6 +1401,7 @@
         $("file-chip").classList.add("hidden");
         $("send-phone").classList.remove("hidden");
         $("send-phone").required = true;
+        syncAttachButtons();
       }
 
       function showFileChip(file, meta) {
@@ -1332,6 +1413,7 @@
         $("send-phone").required = false;
         $("send-phone").value = "";
         $("file-chip").classList.remove("hidden");
+        syncAttachButtons();
       }
 
       $("btn-import-help").addEventListener("click", () => {
@@ -1343,45 +1425,122 @@
               <li><strong>Формати:</strong> <code>.csv</code>, <code>.xlsx</code>, <code>.txt</code></li>
               <li><strong>Ліміт:</strong> до 1000 номерів у одному файлі</li>
               <li><strong>Стовпчик:</strong> назвіть <code>phone</code> / <code>телефон</code> або просто перелік номерів у будь-яких клітинках</li>
-              <li><strong>Формат номера:</strong> UA, нормалізується до <code>+380…</code> (напр. <code>067…</code>, <code>380…</code>)</li>
+              <li><strong>Формат номера:</strong> UA, нормалізується до <code>+380…</code></li>
               <li>Дублікати прибираються; невалідні рядки пропускаються</li>
-              <li>Один текст іде на всі номери; у історії — одна <strong>Групова розсилка</strong> (сесія), яку можна розгорнути</li>
+              <li>Фото: <strong>Додати фото</strong> або URL (<strong>лише https://</strong>, не http)</li>
             </ul>`,
         });
       });
 
+      $("btn-photo-help").addEventListener("click", () => {
+        openModal({
+          title: "Фото в повідомленні",
+          bodyHtml: `
+            <p>Можна <strong>завантажити файл</strong> (Google Drive) або вставити готове посилання в <strong>URL фото</strong>.</p>
+            <ul>
+              <li>Формати upload: jpeg, png, webp, gif</li>
+              <li>Після upload URL заповниться автоматично</li>
+              <li><strong>Важливо:</strong> посилання має бути <strong>https://</strong>, не <code>http://</code></li>
+              <li>Лінк дописується в кінець тексту повідомлення</li>
+            </ul>`,
+        });
+      });
+
+      function setPhotoPreview(url) {
+        const img = $("photo-chip-img");
+        const btn = $("btn-photo-preview");
+        if (url) {
+          img.src = url;
+          btn.disabled = false;
+        } else {
+          img.removeAttribute("src");
+          btn.disabled = true;
+        }
+      }
+
+      function revokePhotoObjectUrl() {
+        if (state.photoObjectUrl) {
+          URL.revokeObjectURL(state.photoObjectUrl);
+          state.photoObjectUrl = null;
+        }
+      }
+
       function clearPhoto() {
         state.imageUrl = null;
         state.photoName = null;
+        state.photoLocked = false;
+        revokePhotoObjectUrl();
+        setPhotoPreview(null);
         $("send-photo").value = "";
         $("photo-chip").classList.add("hidden");
+        setPhotoUrl("", { locked: false });
+        syncAttachButtons();
       }
 
       function showPhotoChip(name, meta) {
-        const ext = (name.split(".").pop() || "IMG").toUpperCase().slice(0, 4);
-        $("photo-chip-ext").textContent = ext;
         $("photo-chip-name").textContent = name;
         $("photo-chip-meta").textContent = meta;
         $("photo-chip").classList.remove("hidden");
+        syncAttachButtons();
       }
+
+      function currentImageUrl() {
+        return ($("photo-url").value || "").trim() || state.imageUrl || "";
+      }
+
+      function assertHttpsUrl(url) {
+        if (!url) return;
+        if (!/^https:\/\//i.test(url)) {
+          throw new Error("URL фото має починатися з https://");
+        }
+      }
+
+      $("photo-url").addEventListener("input", () => {
+        if (state.photoLocked) return;
+        state.imageUrl = ($("photo-url").value || "").trim() || null;
+      });
+
+      $("btn-photo-copy").addEventListener("click", async () => {
+        const url = currentImageUrl();
+        if (!url) return;
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast("URL скопійовано", "ok");
+        } catch {
+          showToast("Не вдалося скопіювати", "bad");
+        }
+      });
 
       $("btn-photo").addEventListener("click", () => $("send-photo").click());
       $("btn-photo-clear").addEventListener("click", clearPhoto);
+      $("btn-photo-preview").addEventListener("click", () => {
+        const url = $("photo-chip-img").getAttribute("src") || currentImageUrl();
+        if (!url) return;
+        openModal({
+          title: state.photoName || "Фото",
+          bodyHtml: `<img class="modal-preview-img" src="${esc(url)}" alt="" />`,
+        });
+      });
       $("send-photo").addEventListener("change", async () => {
         const file = $("send-photo").files?.[0] || null;
         if (!file) {
           clearPhoto();
           return;
         }
+        revokePhotoObjectUrl();
+        state.photoObjectUrl = URL.createObjectURL(file);
+        state.photoName = file.name;
+        setPhotoPreview(state.photoObjectUrl);
         showPhotoChip(file.name, "Завантаження на Google Drive…");
         $("send-err").textContent = "";
-        $("btn-photo").disabled = true;
+        syncAttachButtons();
         try {
           const fd = new FormData();
           fd.append("file", file);
           const up = await api("/media/upload", { method: "POST", body: fd });
-          state.imageUrl = up.url;
-          state.photoName = file.name;
+          revokePhotoObjectUrl();
+          setPhotoUrl(up.url, { locked: true });
+          setPhotoPreview(up.url);
           showPhotoChip(file.name, "Готово · посилання додасться до повідомлення");
           showToast("Фото завантажено", "ok");
         } catch (err) {
@@ -1390,7 +1549,7 @@
           $("send-err").textContent = err.message;
           showToast(err.message, "bad");
         } finally {
-          $("btn-photo").disabled = false;
+          syncAttachButtons();
         }
       });
 
@@ -1428,8 +1587,9 @@
         $("send-result").classList.add("hidden");
         $("send-btn").disabled = true;
         const text = $("send-text").value;
-        const imageUrl = state.imageUrl || "";
         try {
+          const imageUrl = currentImageUrl();
+          assertHttpsUrl(imageUrl);
           if (!text.trim() && !imageUrl) throw new Error("Вкажіть текст або фото");
           if (state.bulkFile) {
             const fd = new FormData();
