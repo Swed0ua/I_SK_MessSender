@@ -42,22 +42,21 @@ class BitrixClient:
             raise BitrixError(f"deal not found: {deal_id}")
         return result
 
-    async def get_contact_phone(self, contact_id: str) -> str | None:
+    async def get_contact(self, contact_id: str) -> dict[str, Any] | None:
         if not contact_id or contact_id in {"0", "None"}:
             return None
         result = await self._call("crm.contact.get", {"ID": contact_id})
         if not isinstance(result, dict):
             return None
+        return result
 
-        phones = result.get("PHONE") or []
-        if not isinstance(phones, list) or not phones:
-            return None
 
-        for item in phones:
-            if isinstance(item, dict) and item.get("VALUE_TYPE") == "MOBILE" and item.get("VALUE"):
-                return str(item["VALUE"]).strip()
-
-        first = phones[0]
-        if isinstance(first, dict) and first.get("VALUE"):
-            return str(first["VALUE"]).strip()
+def first_phone(contact: dict[str, Any]) -> str | None:
+    """First PHONE value from Bitrix contact (no type preference)."""
+    phones = contact.get("PHONE") or []
+    if not isinstance(phones, list) or not phones:
         return None
+    first = phones[0]
+    if isinstance(first, dict) and first.get("VALUE"):
+        return str(first["VALUE"]).strip() or None
+    return None

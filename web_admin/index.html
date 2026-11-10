@@ -1378,9 +1378,8 @@
       drawerBackdrop.addEventListener("click", closeDrawer);
 
       function syncAttachButtons() {
-        const busy = Boolean(state.bulkFile) || Boolean(state.photoName) || state.photoLocked;
-        $("btn-import").disabled = busy;
-        $("btn-photo").disabled = busy;
+        $("btn-import").disabled = Boolean(state.bulkFile);
+        $("btn-photo").disabled = Boolean(state.photoName) || state.photoLocked;
       }
 
       function setPhotoUrl(url, { locked }) {

@@ -6,7 +6,8 @@ from typing import Any, Protocol
 
 import httpx
 
-from app.templates import MAILING_MESSAGE_TYPES, MESSAGE_TEMPLATES, render_template
+from app.bitrix_config import MAILING_MESSAGE_TYPES
+from app.templates import MESSAGE_TEMPLATES, render_template
 
 logger = logging.getLogger(__name__)
 

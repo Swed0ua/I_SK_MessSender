@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.bitrix_config import MESSAGE_TYPE_KASA_VIBER
+from app.bitrix_config import (
+    MESSAGE_TYPE_CABINET_VIBER,
+    MESSAGE_TYPE_KASA_PURCHASE_VIBER,
+)
 
-# message_type -> text. Placeholders: {pdf_url}. No template = do not send.
+# message_type -> text. Placeholders filled via render_template. No template = do not send.
 MESSAGE_TEMPLATES: dict[str, str] = {
     "welcome_new_contractor": (
         "📢 Відкриваєте бізнес або плануєте оновити касове обладнання?\n"
@@ -26,34 +29,41 @@ MESSAGE_TEMPLATES: dict[str, str] = {
         "💬 Напишіть нам у відповідь на це повідомлення та коротко розкажіть "
         "про свій бізнес. Ми підготуємо персональну пропозицію саме для вас."
     ),
-    MESSAGE_TYPE_KASA_VIBER: (
+    MESSAGE_TYPE_CABINET_VIBER: (
         "Добрий день!\n"
         "\n"
-        "Дякуємо, що обрали SmartKasa 💙\n"
-        "Ваше замовлення майже готове — лишилось лише підтвердити оплату.\n"
+        "Надсилаємо Вам рахунок на оплату тарифного плану Смарт Каса.\n"
+        "Рахунок за посиланням {pdf_url}\n"
+        "УВАГА!\n"
+        "Якщо бажаєте, щоб кошти за кабінет були зараховані одразу. "
+        "❗️Відправте це повідомлення в бот з платіжкою\n"
+        "Ми одразу поповнимо баланс вашого кабінету. 🧾✅\n"
         "\n"
-        "📄 Рахунок для оплати:\n"
-        "{pdf_url}\n"
+        "Прошу поповнити баланс кабінету за такими даними:\n"
+        "📱 Номер телефону кабінету: {cabinet_phone}\n"
+        "📄 Номер рахунку на оплату:- {invoice_number}\n"
+        "💰 Сума поповнення: … {amount}\n"
+        "🏢 ФОП / назваТОВ: {fop_tov} {last_name} {first_name}\n"
         "\n"
-        "Будь ласка, після оплати надішліть:\n"
-        "• назву ФОП / ТОВ\n"
-        "• ІПН / ЄДРПОУ\n"
-        "• суму оплати\n"
+        "Телеграм БОТ - https://t.me/Smartkasahelp_bot\n"
+        "Вайбер БОТ- viber://pa?chatURI=smartkasabot\n"
+        "Якщо платіжний документ не надіслано, кошти будуть зараховані на ваш баланс "
+        "наступного банківського дня, після того як ми побачимо надходження на рахунку."
+    ),
+    MESSAGE_TYPE_KASA_PURCHASE_VIBER: (
+        "Добрий день!\n"
         "\n"
-        "Це допоможе нам швидше активувати ваше замовлення ✅\n"
-        "\n"
-        "Якщо виникнуть питання — пишіть у наші боти підтримки:\n"
-        "Telegram: @Smartkasahelp_bot\n"
-        "Viber: smartkasabot\n"
-        "\n"
-        "Дякуємо, що ви з нами! 💙\n"
-        "Команда SmartKasa"
+        "Надсилаємо Вам рахунок на придбання Смарт Каса.\n"
+        "Рахунок за посиланням {pdf_url}\n"
+        "УВАГА!\n"
+        "Обов’язково ВКАЖІТЬ, ЗА КОГО ОПЛАТА, та № РАХУНКУ, а також надішліть нам "
+        "в чат бот ПЛАТІЖКУ, якщо бажаєте, щоб Смарт каса поїхала відразу❗️\n"
+        "Телеграм - https://t.me/Smartkasahelp_bot\n"
+        "Вайбер - viber://pa?chatURI=smartkasabot\n"
+        "Якщо платіжний документ не надіслано каса поїде , "
+        "після того як ми побачимо надходження на рахунку."
     ),
 }
-
-# Types sent via mailing API (not the legacy trigger webhook).
-MAILING_MESSAGE_TYPES = frozenset({MESSAGE_TYPE_KASA_VIBER})
-
 
 def render_template(message_type: str, payload: dict[str, Any] | None = None) -> str | None:
     template = MESSAGE_TEMPLATES.get(message_type)
@@ -61,5 +71,15 @@ def render_template(message_type: str, payload: dict[str, Any] | None = None) ->
         return None
     data = payload or {}
     return template.format(
-        pdf_url=str(data.get("pdf_url") or "").strip(),
+        pdf_url=_val(data, "pdf_url"),
+        cabinet_phone=_val(data, "cabinet_phone"),
+        invoice_number=_val(data, "invoice_number"),
+        amount=_val(data, "amount"),
+        fop_tov=_val(data, "fop_tov"),
+        last_name=_val(data, "last_name"),
+        first_name=_val(data, "first_name"),
     )
+
+
+def _val(data: dict[str, Any], key: str) -> str:
+    return str(data.get(key) or "").strip()

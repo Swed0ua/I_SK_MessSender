@@ -6,11 +6,13 @@ from typing import Any
 from fastapi import Request
 
 from app import db
-from app.bitrix_client import BitrixClient, BitrixError
+from app.bitrix_client import BitrixClient, BitrixError, first_phone
 from app.bitrix_config import (
+    FIELD_CABINET_PHONE,
+    FIELD_CONTACT_FOP_TOV,
+    FIELD_INVOICE_1C,
     FIELD_PDF_URL,
-    MESSAGE_TYPE_KASA_VIBER,
-    STAGE_KASA_VIBER,
+    STAGE_MESSAGE_TYPES,
 )
 from app.phone import PhoneError, normalize_phone
 from app.worker import NotificationWorker
@@ -27,7 +29,6 @@ def _str(value: Any) -> str | None:
 
 async def parse_bitrix_request(request: Request) -> dict[str, Any]:
     """Parse Bitrix webhook body (form or JSON)."""
-    payload: dict[str, Any] = {}
     content_type = (request.headers.get("content-type") or "").lower()
 
     if "application/json" in content_type:
@@ -41,9 +42,9 @@ async def parse_bitrix_request(request: Request) -> dict[str, Any]:
         or content_type == ""
     ):
         form = await request.form()
-        payload.update({str(k): v for k, v in form.items()})
+        return {str(k): v for k, v in form.items()}
 
-    return payload
+    return {}
 
 
 def extract_deal_id(payload: dict[str, Any]) -> str | None:
@@ -66,11 +67,13 @@ def extract_deal_id(payload: dict[str, Any]) -> str | None:
     return _str(payload.get("ID") or payload.get("id"))
 
 
-async def process_kasa_viber(
+async def enqueue_mailing(
     *,
     phone_raw: str,
-    pdf_url: str,
+    message_type: str,
+    stage_id: str,
     deal_id: str,
+    payload: dict[str, Any],
     pool: Any,
     worker: NotificationWorker,
 ) -> dict[str, Any]:
@@ -79,37 +82,41 @@ async def process_kasa_viber(
     except PhoneError as exc:
         return {"accepted": False, "reason": "invalid_phone", "detail": str(exc)}
 
-    idempotency_key = f"bitrix:{deal_id}:{STAGE_KASA_VIBER}"
+    idempotency_key = f"bitrix:{deal_id}:{stage_id}"
+    row_payload = {**payload, "deal_id": deal_id, "stage_id": stage_id}
 
     row, created = await db.insert_notification(
         pool,
         phone=phone,
-        message_type=MESSAGE_TYPE_KASA_VIBER,
-        payload={"pdf_url": pdf_url, "deal_id": deal_id, "stage_id": STAGE_KASA_VIBER},
+        message_type=message_type,
+        payload=row_payload,
         idempotency_key=idempotency_key,
     )
 
     if not created:
         logger.info(
-            "bitrix_kasa_viber duplicate id=%s phone=%s deal_id=%s",
+            "bitrix_mailing duplicate id=%s phone=%s deal_id=%s stage_id=%s",
             row["id"],
             phone,
             deal_id,
+            stage_id,
         )
         return {
             "accepted": True,
             "duplicate": True,
             "id": row["id"],
             "status": row["status"],
-            "message_type": MESSAGE_TYPE_KASA_VIBER,
+            "message_type": message_type,
         }
 
     worker.enqueue(row["id"])
     logger.info(
-        "bitrix_kasa_viber accepted id=%s phone=%s deal_id=%s",
+        "bitrix_mailing accepted id=%s phone=%s deal_id=%s stage_id=%s message_type=%s",
         row["id"],
         phone,
         deal_id,
+        stage_id,
+        message_type,
     )
     return {
         "accepted": True,
@@ -117,7 +124,7 @@ async def process_kasa_viber(
         "id": row["id"],
         "status": "pending",
         "phone": phone,
-        "message_type": MESSAGE_TYPE_KASA_VIBER,
+        "message_type": message_type,
     }
 
 
@@ -142,7 +149,8 @@ async def dispatch_notification_mailing(
     if not stage_id:
         return {"accepted": False, "reason": "missing_stage_id"}
 
-    if stage_id != STAGE_KASA_VIBER:
+    message_type = STAGE_MESSAGE_TYPES.get(stage_id)
+    if not message_type:
         logger.info("bitrix_stage_ignored stage_id=%s deal_id=%s", stage_id, deal_id)
         return {"accepted": False, "reason": "ignored_stage", "stage_id": stage_id}
 
@@ -152,18 +160,30 @@ async def dispatch_notification_mailing(
 
     contact_id = _str(deal.get("CONTACT_ID"))
     try:
-        phone_raw = await bitrix.get_contact_phone(contact_id) if contact_id else None
+        contact = await bitrix.get_contact(contact_id) if contact_id else None
     except BitrixError as exc:
         logger.exception("bitrix_get_contact_failed contact_id=%s", contact_id)
         return {"accepted": False, "reason": "bitrix_error", "detail": str(exc)}
 
+    phone_raw = first_phone(contact) if contact else None
     if not phone_raw:
         return {"accepted": False, "reason": "missing_phone", "deal_id": deal_id}
 
-    return await process_kasa_viber(
+    template_payload = {
+        "pdf_url": pdf_url,
+        "cabinet_phone": _str(deal.get(FIELD_CABINET_PHONE)) or "",
+        "invoice_number": _str(deal.get(FIELD_INVOICE_1C)) or "",
+        "amount": _str(deal.get("OPPORTUNITY")) or "",
+        "fop_tov": _str(contact.get(FIELD_CONTACT_FOP_TOV)) or "",
+        "last_name": _str(contact.get("LAST_NAME")) or "",
+        "first_name": _str(contact.get("NAME")) or "",
+    }
+    return await enqueue_mailing(
         phone_raw=phone_raw,
-        pdf_url=pdf_url,
+        message_type=message_type,
+        stage_id=stage_id,
         deal_id=deal_id,
+        payload=template_payload,
         pool=pool,
         worker=worker,
     )
