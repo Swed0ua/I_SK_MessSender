@@ -12,7 +12,7 @@ from app.bitrix_config import (
     FIELD_CONTACT_FOP_TOV,
     FIELD_INVOICE_1C,
     FIELD_PDF_URL,
-    STAGE_MESSAGE_TYPES,
+    get_stage_routes,
 )
 from app.phone import PhoneError, normalize_phone
 from app.worker import NotificationWorker
@@ -149,8 +149,8 @@ async def dispatch_notification_mailing(
     if not stage_id:
         return {"accepted": False, "reason": "missing_stage_id"}
 
-    message_type = STAGE_MESSAGE_TYPES.get(stage_id)
-    if not message_type:
+    route = get_stage_routes().get(stage_id)
+    if not route:
         logger.info("bitrix_stage_ignored stage_id=%s deal_id=%s", stage_id, deal_id)
         return {"accepted": False, "reason": "ignored_stage", "stage_id": stage_id}
 
@@ -177,10 +177,11 @@ async def dispatch_notification_mailing(
         "fop_tov": _str(contact.get(FIELD_CONTACT_FOP_TOV)) or "",
         "last_name": _str(contact.get("LAST_NAME")) or "",
         "first_name": _str(contact.get("NAME")) or "",
+        "channel": route.channel,
     }
     return await enqueue_mailing(
         phone_raw=phone_raw,
-        message_type=message_type,
+        message_type=route.message_type,
         stage_id=stage_id,
         deal_id=deal_id,
         payload=template_payload,

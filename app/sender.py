@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 import httpx
 
-from app.bitrix_config import MAILING_MESSAGE_TYPES
+from app.bitrix_config import ALPHASMS_MESSAGE_TYPES, MAILING_MESSAGE_TYPES
 from app.templates import MESSAGE_TEMPLATES, render_template
 
 logger = logging.getLogger(__name__)
@@ -93,11 +93,17 @@ class WebhookSender:
 
 
 class RoutingSender:
-    """Welcome → PROVIDER trigger; Bitrix mailing → separate Trigger Outreach URL."""
+    """Welcome → PROVIDER; Bitrix MyChatbot mailing; Bitrix AlphaSMS mailing."""
 
-    def __init__(self, welcome: WebhookSender, mailing: WebhookSender | None) -> None:
+    def __init__(
+        self,
+        welcome: WebhookSender,
+        mailing: WebhookSender | None,
+        alphasms: MessageSender | None = None,
+    ) -> None:
         self._welcome = welcome
         self._mailing = mailing
+        self._alphasms = alphasms
 
     async def send(
         self,
@@ -105,6 +111,10 @@ class RoutingSender:
         message_type: str,
         payload: dict[str, Any],
     ) -> SendResult:
+        if message_type in ALPHASMS_MESSAGE_TYPES:
+            if self._alphasms is None:
+                return SendResult(ok=False, error="alphasms is not configured")
+            return await self._alphasms.send(phone, message_type, payload)
         if message_type in MAILING_MESSAGE_TYPES:
             if self._mailing is None:
                 return SendResult(ok=False, error="mailing trigger is not configured")

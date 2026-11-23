@@ -15,6 +15,7 @@ from app.bitrix_client import BitrixClient
 from app.config import Settings, load_settings
 from app.phone import PhoneError, normalize_phone
 from app.schemas import NotificationCreate
+from app.alphasms import AlphaSmsSender
 from app.sender import RoutingSender, WebhookSender
 from app.worker import NotificationWorker
 
@@ -49,7 +50,10 @@ async def lifespan(app: FastAPI):
     mailing = None
     if settings.mychatbot_mailing_webhook_url:
         mailing = WebhookSender(settings.mychatbot_mailing_webhook_url, render=True)
-    sender = RoutingSender(welcome, mailing)
+    alphasms = None
+    if settings.alphasms_api_key and settings.alphasms_viber_signature:
+        alphasms = AlphaSmsSender(settings.alphasms_api_key, settings.alphasms_viber_signature)
+    sender = RoutingSender(welcome, mailing, alphasms)
     worker = NotificationWorker(
         pool,
         sender,

@@ -32,6 +32,8 @@ class Settings:
     provider_webhook_url: str
     mychatbot_mailing_webhook_url: str | None
     bitrix_webhook_url: str | None
+    alphasms_api_key: str | None
+    alphasms_viber_signature: str | None
 
 
 def load_settings() -> Settings:
@@ -46,4 +48,6 @@ def load_settings() -> Settings:
         provider_webhook_url=_require("PROVIDER_WEBHOOK_URL"),
         mychatbot_mailing_webhook_url=_optional("MYCHATBOT_MAILING_WEBHOOK_URL"),
         bitrix_webhook_url=_optional("BITRIX_WEBHOOK_URL"),
+        alphasms_api_key=_optional("ALPHASMS_API_KEY"),
+        alphasms_viber_signature=_optional("ALPHASMS_VIBER_SIGNATURE"),
     )
