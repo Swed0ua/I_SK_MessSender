@@ -36,6 +36,9 @@ class Settings:
     alphasms_viber_signature: str | None
     mychatbot_list_iblock_id: str | None
     mychatbot_list_template_property: str | None
+    mychatbot_list_fallback_iblock_id: str | None
+    mychatbot_list_fallback_template_property: str | None
+    mychatbot_list_fallback_photo_property: str | None
 
 
 def load_settings() -> Settings:
@@ -54,4 +57,11 @@ def load_settings() -> Settings:
         alphasms_viber_signature=_optional("ALPHASMS_VIBER_SIGNATURE"),
         mychatbot_list_iblock_id=_optional("MYCHATBOT_LIST_IBLOCK_ID"),
         mychatbot_list_template_property=_optional("MYCHATBOT_LIST_TEMPLATE_PROPERTY"),
+        mychatbot_list_fallback_iblock_id=_optional("MYCHATBOT_LIST_FALLBACK_IBLOCK_ID"),
+        mychatbot_list_fallback_template_property=_optional(
+            "MYCHATBOT_LIST_FALLBACK_TEMPLATE_PROPERTY"
+        ),
+        mychatbot_list_fallback_photo_property=_optional(
+            "MYCHATBOT_LIST_FALLBACK_PHOTO_PROPERTY"
+        ),
     )

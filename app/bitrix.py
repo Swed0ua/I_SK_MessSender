@@ -17,7 +17,12 @@ from app.bitrix_config import (
     MYCHATBOT_LIST_CATEGORY_ID,
     get_stage_routes,
 )
-from app.bitrix_list import fill_placeholders, find_list_template, stage_name_for_id
+from app.bitrix_list import (
+    ListTemplateHit,
+    fill_placeholders,
+    find_list_template,
+    stage_name_for_id,
+)
 from app.config import Settings
 from app.phone import PhoneError, normalize_phone
 from app.worker import NotificationWorker
@@ -187,19 +192,19 @@ async def _dispatch_list_mychatbot(
             )
             return {"accepted": False, "reason": "ignored_stage", "stage_id": stage_id}
 
-        elements = await bitrix.get_list_elements(iblock_id)
-        template = find_list_template(
-            elements,
+        hit = await _resolve_list_template(
+            bitrix,
+            settings,
             stage_name=stage_name,
-            property_code=property_code,
+            primary_iblock_id=iblock_id,
+            primary_property=property_code,
         )
-        if not template:
+        if hit is None:
             logger.info(
-                "bitrix_list_template_missing stage_id=%s stage_name=%s deal_id=%s iblock_id=%s",
+                "bitrix_list_template_missing stage_id=%s stage_name=%s deal_id=%s",
                 stage_id,
                 stage_name,
                 deal_id,
-                iblock_id,
             )
             return {
                 "accepted": False,
@@ -219,12 +224,14 @@ async def _dispatch_list_mychatbot(
         return {"accepted": False, "reason": "missing_phone", "deal_id": deal_id}
 
     values = _deal_template_values(deal, contact)
-    context = fill_placeholders(template, values)
+    context = fill_placeholders(hit.text, values)
     logger.info(
-        "bitrix_list_template_matched stage_id=%s stage_name=%s deal_id=%s",
+        "bitrix_list_template_matched stage_id=%s stage_name=%s deal_id=%s iblock_id=%s photo=%s",
         stage_id,
         stage_name,
         deal_id,
+        hit.iblock_id,
+        bool(hit.photo_url),
     )
     return await enqueue_mailing(
         phone_raw=phone_raw,
@@ -236,9 +243,49 @@ async def _dispatch_list_mychatbot(
             "channel": CHANNEL_MYCHATBOT,
             "context": context,
             "stage_name": stage_name,
+            "list_iblock_id": hit.iblock_id,
         },
         pool=pool,
         worker=worker,
+    )
+
+
+async def _resolve_list_template(
+    bitrix: BitrixClient,
+    settings: Settings,
+    *,
+    stage_name: str,
+    primary_iblock_id: str,
+    primary_property: str,
+) -> ListTemplateHit | None:
+    primary_elements = await bitrix.get_list_elements(primary_iblock_id)
+    hit = find_list_template(
+        primary_elements,
+        stage_name=stage_name,
+        property_code=primary_property,
+        iblock_id=primary_iblock_id,
+    )
+    if hit is not None:
+        return hit
+
+    fallback_iblock = settings.mychatbot_list_fallback_iblock_id
+    fallback_property = settings.mychatbot_list_fallback_template_property
+    if not fallback_iblock or not fallback_property:
+        return None
+
+    logger.info(
+        "bitrix_list_primary_miss stage_name=%s iblock_id=%s trying_fallback=%s",
+        stage_name,
+        primary_iblock_id,
+        fallback_iblock,
+    )
+    fallback_elements = await bitrix.get_list_elements(fallback_iblock)
+    return find_list_template(
+        fallback_elements,
+        stage_name=stage_name,
+        property_code=fallback_property,
+        iblock_id=fallback_iblock,
+        photo_property=settings.mychatbot_list_fallback_photo_property,
     )
 
 
