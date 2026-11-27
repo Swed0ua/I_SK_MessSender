@@ -6,7 +6,11 @@ from typing import Any, Protocol
 
 import httpx
 
-from app.bitrix_config import ALPHASMS_MESSAGE_TYPES, MAILING_MESSAGE_TYPES
+from app.bitrix_config import (
+    ALPHASMS_MESSAGE_TYPES,
+    MAILING_MESSAGE_TYPES,
+    MESSAGE_TYPE_LIST_MYCHATBOT,
+)
 from app.templates import MESSAGE_TEMPLATES, render_template
 
 logger = logging.getLogger(__name__)
@@ -70,7 +74,9 @@ class WebhookSender:
         message_type: str,
         payload: dict[str, Any],
     ) -> SendResult:
-        if self._render:
+        if message_type == MESSAGE_TYPE_LIST_MYCHATBOT:
+            context = str(payload.get("context") or "").strip() or None
+        elif self._render:
             context = render_template(message_type, payload)
         else:
             context = MESSAGE_TEMPLATES.get(message_type)

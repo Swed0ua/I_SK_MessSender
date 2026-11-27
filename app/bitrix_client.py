@@ -50,6 +50,21 @@ class BitrixClient:
             return None
         return result
 
+    async def get_deal_category_stages(self, category_id: str) -> list[dict[str, Any]]:
+        result = await self._call("crm.dealcategory.stage.list", {"id": category_id})
+        if not isinstance(result, list):
+            return []
+        return [row for row in result if isinstance(row, dict)]
+
+    async def get_list_elements(self, iblock_id: str) -> list[dict[str, Any]]:
+        result = await self._call(
+            "lists.element.get",
+            {"IBLOCK_TYPE_ID": "lists", "IBLOCK_ID": iblock_id},
+        )
+        if not isinstance(result, list):
+            return []
+        return [row for row in result if isinstance(row, dict)]
+
 
 def first_phone(contact: dict[str, Any]) -> str | None:
     """First PHONE value from Bitrix contact (no type preference)."""

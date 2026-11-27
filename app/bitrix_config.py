@@ -18,15 +18,20 @@ MESSAGE_TYPE_CABINET_VIBER = "bitrix_cabinet_invoice_viber"
 MESSAGE_TYPE_KASA_PURCHASE_VIBER = "bitrix_kasa_purchase_viber"
 MESSAGE_TYPE_CABINET_ALPHASMS = "bitrix_cabinet_invoice_alphasms"
 MESSAGE_TYPE_KASA_PURCHASE_ALPHASMS = "bitrix_kasa_purchase_alphasms"
+MESSAGE_TYPE_LIST_MYCHATBOT = "bitrix_list_mychatbot"
 
 MAILING_MESSAGE_TYPES = frozenset({
     MESSAGE_TYPE_CABINET_VIBER,
     MESSAGE_TYPE_KASA_PURCHASE_VIBER,
+    MESSAGE_TYPE_LIST_MYCHATBOT,
 })
 ALPHASMS_MESSAGE_TYPES = frozenset({
     MESSAGE_TYPE_CABINET_ALPHASMS,
     MESSAGE_TYPE_KASA_PURCHASE_ALPHASMS,
 })
+
+# Bitrix list fallback (after hardcoded stage map): category 34 ↔ list by stage NAME
+MYCHATBOT_LIST_CATEGORY_ID = "34"
 
 
 @dataclass(frozen=True)

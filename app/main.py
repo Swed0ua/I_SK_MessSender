@@ -242,6 +242,7 @@ async def bitrix_notification_mailing(
         pool=pool,
         worker=worker,
         bitrix=bitrix,
+        settings=settings,
     )
 
     if result.get("accepted") and not result.get("duplicate"):
